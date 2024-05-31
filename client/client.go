@@ -70,7 +70,7 @@ func NewRPCClient(config RPCClientConfig) (*RPCClient, error) {
 }
 
 // Close closes the underlying websocket connection and stop the receiving loop.
-func (client *RPCClient) Close() error {
+func (client *RPCClient) Close() {
 	log.Warn("Close the rpc client...")
 	client.stop_signal <- struct{}{}
 
@@ -81,7 +81,6 @@ func (client *RPCClient) Close() error {
 
 	client.request_chans.clear()
 	client.subscriptions.clear()
-	return nil
 }
 
 // Call sends an RPC call to the server with the specified method and parameters.

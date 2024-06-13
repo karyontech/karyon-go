@@ -14,9 +14,9 @@ type messageDispatcher[K comparable, V any] struct {
 }
 
 // newMessageDispatcher Creates a new messageDispatcher
-func newMessageDispatcher[K comparable, V any](bufferSize int) messageDispatcher[K, V] {
+func newMessageDispatcher[K comparable, V any](bufferSize int) *messageDispatcher[K, V] {
 	chans := make(map[K]chan<- V)
-	return messageDispatcher[K, V]{
+	return &messageDispatcher[K, V]{
 		chans:      chans,
 		bufferSize: bufferSize,
 	}

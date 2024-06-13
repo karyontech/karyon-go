@@ -32,8 +32,8 @@ type RPCClientConfig struct {
 type RPCClient struct {
 	config      RPCClientConfig
 	conn        *websocket.Conn
-	requests    messageDispatcher[message.RequestID, message.Response]
-	subscriber  messageDispatcher[message.SubscriptionID, json.RawMessage]
+	requests    *messageDispatcher[message.RequestID, message.Response]
+	subscriber  *messageDispatcher[message.SubscriptionID, json.RawMessage]
 	stop_signal chan struct{}
 }
 

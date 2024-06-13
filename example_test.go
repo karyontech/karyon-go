@@ -1,4 +1,4 @@
-package main
+package karyongo 
 
 import (
 	"encoding/json"

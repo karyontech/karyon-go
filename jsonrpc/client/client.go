@@ -11,33 +11,33 @@ import (
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/karyontech/karyon-go/message"
+	"github.com/karyontech/karyon-go/jsonrpc/message"
 )
 
 const (
-	// JsonRPCVersion defines the version of the JSON-RPC protocol being used.
+	// JsonRPCVersion Defines the version of the JSON-RPC protocol being used.
 	JsonRPCVersion = "2.0"
 
 	// Default timeout for receiving requests from the server, in milliseconds.
 	DefaultTimeout = 3000
 )
 
-// RPCClientConfig holds the configuration settings for the RPC client.
+// RPCClientConfig Holds the configuration settings for the RPC client.
 type RPCClientConfig struct {
 	Timeout int    // Timeout for receiving requests from the server, in milliseconds.
 	Addr    string // Address of the RPC server.
 }
 
-// RPCClient
+// RPCClient RPC Client
 type RPCClient struct {
-	config        RPCClientConfig
-	conn          *websocket.Conn
-	request_chans channels[message.RequestID, message.Response]
-	subscriptions channels[message.SubscriptionID, json.RawMessage]
-	stop_signal   chan struct{}
+	config      RPCClientConfig
+	conn        *websocket.Conn
+	requests    messageDispatcher[message.RequestID, message.Response]
+	subscriber  messageDispatcher[message.SubscriptionID, json.RawMessage]
+	stop_signal chan struct{}
 }
 
-// NewRPCClient creates a new instance of RPCClient with the provided configuration.
+// NewRPCClient Creates a new instance of RPCClient with the provided configuration.
 // It establishes a WebSocket connection to the RPC server.
 func NewRPCClient(config RPCClientConfig) (*RPCClient, error) {
 	conn, _, err := websocket.DefaultDialer.Dial(config.Addr, nil)
@@ -53,11 +53,11 @@ func NewRPCClient(config RPCClientConfig) (*RPCClient, error) {
 	stop_signal := make(chan struct{}, 2)
 
 	client := &RPCClient{
-		conn:          conn,
-		config:        config,
-		request_chans: newChannels[message.RequestID, message.Response](1),
-		subscriptions: newChannels[message.SubscriptionID, json.RawMessage](10),
-		stop_signal:   stop_signal,
+		conn:        conn,
+		config:      config,
+		requests:    newMessageDispatcher[message.RequestID, message.Response](1),
+		subscriber:  newMessageDispatcher[message.SubscriptionID, json.RawMessage](10),
+		stop_signal: stop_signal,
 	}
 
 	go func() {
@@ -69,30 +69,27 @@ func NewRPCClient(config RPCClientConfig) (*RPCClient, error) {
 	return client, nil
 }
 
-// Close closes the underlying websocket connection and stop the receiving loop.
+// Close Closes the underlying websocket connection and stop the receiving loop.
 func (client *RPCClient) Close() {
 	log.Warn("Close the rpc client...")
+	// Send stop signal to the background receiving loop
 	client.stop_signal <- struct{}{}
 
+	// Close the underlying websocket connection
 	err := client.conn.Close()
 	if err != nil {
 		log.WithError(err).Error("Close websocket connection")
 	}
 
-	client.request_chans.clear()
-	client.subscriptions.clear()
+	client.requests.clear()
+	client.subscriber.clear()
 }
 
-// Call sends an RPC call to the server with the specified method and parameters.
-// It returns the response from the server.
+// Call Sends an RPC call to the server with the specified method and
+// parameters, and returns the response.
 func (client *RPCClient) Call(method string, params any) (*json.RawMessage, error) {
 	log.Tracef("Call -> method: %s, params: %v", method, params)
-	param_raw, err := json.Marshal(params)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := client.sendRequest(method, param_raw)
+	response, err := client.sendRequest(method, params)
 	if err != nil {
 		return nil, err
 	}
@@ -100,16 +97,12 @@ func (client *RPCClient) Call(method string, params any) (*json.RawMessage, erro
 	return response.Result, nil
 }
 
-// Subscribe sends a subscription request to the server with the specified method and parameters.
-// It returns the subscription ID and a channel to receive notifications.
+// Subscribe Sends a subscription request to the server with the specified
+// method and parameters, and it returns the subscription ID and the channel to
+// receive notifications.
 func (client *RPCClient) Subscribe(method string, params any) (message.SubscriptionID, <-chan json.RawMessage, error) {
 	log.Tracef("Sbuscribe ->  method: %s, params: %v", method, params)
-	param_raw, err := json.Marshal(params)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	response, err := client.sendRequest(method, param_raw)
+	response, err := client.sendRequest(method, params)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -124,57 +117,68 @@ func (client *RPCClient) Subscribe(method string, params any) (message.Subscript
 		return 0, nil, err
 	}
 
-	ch := client.subscriptions.add(subID)
+	// Register a new subscription
+	sub := client.subscriber.register(subID)
 
-	return subID, ch, nil
+	return subID, sub, nil
 }
 
-// Unsubscribe sends an unsubscription request to the server to cancel the given subscription.
+// Unsubscribe Sends an unsubscription request to the server to cancel the
+// given subscription.
 func (client *RPCClient) Unsubscribe(method string, subID message.SubscriptionID) error {
 	log.Tracef("Unsubscribe -> method: %s, subID: %d", method, subID)
-	subIDJSON, err := json.Marshal(subID)
+	_, err := client.sendRequest(method, subID)
 	if err != nil {
 		return err
 	}
 
-	_, err = client.sendRequest(method, subIDJSON)
-	if err != nil {
-		return err
-	}
-
-	// on success remove the subscription from the map
-	client.subscriptions.remove(subID)
+	// On success unregister the subscription channel
+	client.subscriber.unregister(subID)
 
 	return nil
 }
 
-// backgroundReceivingLoop starts reading new messages from the underlying connection.
+// backgroundReceivingLoop Starts reading new messages from the underlying connection.
 func (client *RPCClient) backgroundReceivingLoop(stop_signal <-chan struct{}) error {
+
 	log.Debug("Background loop started")
+
+	new_msg_ch := make(chan []byte)
+	receive_err_ch := make(chan error)
+
+	// Start listing for new messages
+	go func() {
+		for {
+			_, msg, err := client.conn.ReadMessage()
+			if err != nil {
+				receive_err_ch <- err
+				return
+			}
+			new_msg_ch <- msg
+		}
+	}()
+
 	for {
 		select {
 		case <-stop_signal:
 			log.Warn("Stopping background receiving loop: received stop signal")
 			return nil
-		default:
-			_, msg, err := client.conn.ReadMessage()
-			if err != nil {
-				log.WithError(err).Error("Receive a new msg")
-				return err
-			}
-
-			err = client.handleNewMsg(msg)
+		case msg := <-new_msg_ch:
+			err := client.handleNewMsg(msg)
 			if err != nil {
 				log.WithError(err).Error("Handle a new received msg")
 			}
+		case err := <-receive_err_ch:
+			log.WithError(err).Error("Receive a new msg")
+			return err
 		}
 	}
 }
 
-// handleNewMsg attempts to decode the received message into either a Response
-// or Notification struct.
+// handleNewMsg Attempts to decode the received message into either a Response
+// or Notification.
 func (client *RPCClient) handleNewMsg(msg []byte) error {
-	// try to decode the msg into message.Response
+	// Check if the received message is of type Response
 	response := message.Response{}
 	decoder := json.NewDecoder(bytes.NewReader(msg))
 	decoder.DisallowUnknownFields()
@@ -183,28 +187,27 @@ func (client *RPCClient) handleNewMsg(msg []byte) error {
 			return fmt.Errorf("Response doesn't have an id")
 		}
 
-		if v := client.request_chans.remove(*response.ID); v != nil {
-			v <- response
+		err := client.requests.disptach(*response.ID, response)
+		if err != nil {
+			return fmt.Errorf("Dispatch a response: %w", err)
 		}
 
 		return nil
 	}
 
-	// try to decode the msg into message.Notification
+	// Check if the received message is of type Notification
 	notification := message.Notification{}
 	if err := json.Unmarshal(msg, &notification); err == nil {
 
-		notificationResult := message.NotificationResult{}
-		if err := json.Unmarshal(*notification.Params, &notificationResult); err != nil {
+		ntRes := message.NotificationResult{}
+		if err := json.Unmarshal(*notification.Params, &ntRes); err != nil {
 			return fmt.Errorf("Failed to unmarshal notification params: %w", err)
 		}
 
-		err := client.subscriptions.notify(
-			notificationResult.Subscription,
-			*notificationResult.Result,
-		)
+		// Send the notification to the subscription
+		err := client.subscriber.disptach(ntRes.Subscription, *ntRes.Result)
 		if err != nil {
-			return fmt.Errorf("Notify a subscriber: %w", err)
+			return fmt.Errorf("Dispatch a notification: %w", err)
 		}
 
 		log.Debugf("<-- %s", notification.String())
@@ -215,19 +218,25 @@ func (client *RPCClient) handleNewMsg(msg []byte) error {
 	return fmt.Errorf("Receive unexpected msg: %s", msg)
 }
 
-// sendRequest sends a request and wait the response
-func (client *RPCClient) sendRequest(method string, params []byte) (message.Response, error) {
-	id := strconv.Itoa(rand.Int())
-	params_raw := json.RawMessage(params)
+// sendRequest Sends a request and wait for the response
+func (client *RPCClient) sendRequest(method string, params any) (message.Response, error) {
+	response := message.Response{}
 
+	params_bytes, err := json.Marshal(params)
+	if err != nil {
+		return response, err
+	}
+
+	params_raw := json.RawMessage(params_bytes)
+
+	// Generate a new id
+	id := strconv.Itoa(rand.Int())
 	req := message.Request{
 		JSONRPC: JsonRPCVersion,
 		ID:      id,
 		Method:  method,
 		Params:  &params_raw,
 	}
-
-	response := message.Response{}
 
 	reqJSON, err := json.Marshal(req)
 	if err != nil {
@@ -241,13 +250,14 @@ func (client *RPCClient) sendRequest(method string, params []byte) (message.Resp
 
 	log.Debugf("--> %s", req.String())
 
-	req_chan := client.request_chans.add(id)
+	rx_ch := client.requests.register(id)
+	defer client.requests.unregister(id)
 
-	response, err = client.waitResponse(req_chan)
-	if err != nil {
-		log.WithError(err).Errorf("Receive a response from the server")
-		client.request_chans.remove(id)
-		return response, err
+	// Waits the response, it fails and return error if it exceed the timeout
+	select {
+	case response = <-rx_ch:
+	case <-time.After(time.Duration(client.config.Timeout) * time.Millisecond):
+		return response, fmt.Errorf("Timeout error")
 	}
 
 	err = validateResponse(&response, id)
@@ -258,17 +268,6 @@ func (client *RPCClient) sendRequest(method string, params []byte) (message.Resp
 	log.Debugf("<-- %s", response.String())
 
 	return response, nil
-}
-
-// waitResponse waits the response, it fails and return error if it exceed the timeout
-func (client *RPCClient) waitResponse(ch <-chan message.Response) (message.Response, error) {
-	response := message.Response{}
-	select {
-	case response = <-ch:
-		return response, nil
-	case <-time.After(time.Duration(client.config.Timeout) * time.Millisecond):
-		return response, fmt.Errorf("Timeout error")
-	}
 }
 
 // validateResponse Checks the error field and whether the request id is the

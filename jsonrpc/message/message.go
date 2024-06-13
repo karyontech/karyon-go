@@ -65,5 +65,5 @@ func (nt *Notification) String() string {
 }
 
 func (err *Error) String() string {
-	return fmt.Sprintf("{CODE: %d, MESSAGE: %s, DATA: %s}", err.Code, err.Message, *err.Data)
+	return fmt.Sprintf("{CODE: %d, MESSAGE: %s, DATA: %b}", err.Code, err.Message, err.Data)
 }

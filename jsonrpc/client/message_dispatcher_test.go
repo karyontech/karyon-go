@@ -1,9 +1,6 @@
 package client
 
 import (
-	// "sync"
-	// "sync/atomic"
-
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -12,7 +9,6 @@ import (
 )
 
 func TestDispatchToChannel(t *testing.T) {
-
 	messageDispatcher := newMessageDispatcher[int, int](10)
 
 	chanKey := 1
@@ -26,7 +22,7 @@ func TestDispatchToChannel(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		for i := 0; i < 50; i++ {
-			err := messageDispatcher.disptach(chanKey, i)
+			err := messageDispatcher.dispatch(chanKey, i)
 			assert.Nil(t, err)
 		}
 
@@ -37,7 +33,7 @@ func TestDispatchToChannel(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		for i := 0; i < 50; i++ {
-			err := messageDispatcher.disptach(chanKey2, i)
+			err := messageDispatcher.dispatch(chanKey2, i)
 			assert.Nil(t, err)
 		}
 
@@ -79,12 +75,11 @@ func TestUnregisterChannel(t *testing.T) {
 	_, ok := <-rx
 	assert.False(t, ok, "chan closed")
 
-	err := messageDispatcher.disptach(chanKey, 1)
+	err := messageDispatcher.dispatch(chanKey, 1)
 	assert.NotNil(t, err)
 }
 
 func TestClearChannels(t *testing.T) {
-
 	messageDispatcher := newMessageDispatcher[int, int](1)
 
 	chanKey := 1
@@ -96,6 +91,6 @@ func TestClearChannels(t *testing.T) {
 	_, ok := <-rx
 	assert.False(t, ok, "chan closed")
 
-	err := messageDispatcher.disptach(chanKey, 1)
+	err := messageDispatcher.dispatch(chanKey, 1)
 	assert.NotNil(t, err)
 }

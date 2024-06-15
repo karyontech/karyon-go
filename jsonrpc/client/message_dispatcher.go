@@ -40,17 +40,18 @@ func (c *messageDispatcher[K, V]) length() int {
 	return len(c.chans)
 }
 
-// disptach Disptaches the msg to the channel with the given key
-func (c *messageDispatcher[K, V]) disptach(key K, msg V) error {
+// dispatch Disptaches the msg to the channel with the given key
+func (c *messageDispatcher[K, V]) dispatch(key K, msg V) error {
 	c.Lock()
-	defer c.Unlock()
+	ch, ok := c.chans[key]
+	c.Unlock()
 
-	if ch, ok := c.chans[key]; ok {
-		ch <- msg
-		return nil
+	if !ok {
+		return fmt.Errorf("Channel not found")
 	}
 
-	return fmt.Errorf("Channel not found")
+	ch <- msg
+	return nil
 }
 
 // unregister Unregisters the channel with the provided key

@@ -21,14 +21,14 @@ if err != nil {
 }
 defer client.Close()
 
-subID, ch, err := client.Subscribe("RPCService.log_subscribe", nil)
+sub, err := client.Subscribe("RPCService.log_subscribe", nil)
 if err != nil {
 	log.Fatal(err)
 }
-log.Infof("Subscribed successfully: %d\n", subID)
+log.Infof("Subscribed successfully: %d\n", sub.ID)
 
 go func() {
-	for notification := range ch {
+	for notification := range sub.Recv() {
 		log.Infof("Receive new notification: %s\n", notification)
 	}
 }()

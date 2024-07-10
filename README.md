@@ -3,6 +3,12 @@
 
 karyon jsonrpc client, written in go.
 
+## Install
+
+```sh
+    go get github.com/karyontech/karyon-go 
+```
+
 ## Example 
 
 ```go
@@ -16,10 +22,10 @@ config := rpc.RPCClientConfig{
 }
 
 client, err := rpc.NewRPCClient(config)
+defer client.Close()
 if err != nil {
 	log.Fatal(err)
 }
-defer client.Close()
 
 sub, err := client.Subscribe("RPCService.log_subscribe", nil)
 if err != nil {
@@ -39,4 +45,12 @@ if err != nil {
 }
 ```
 
+## License
 
+This project is licensed under the GPL-3.0 License. See the
+[LICENSE](https://github.com/karyontech/karyon-go/blob/master/LICENSE) file for
+details. 
+
+## Contributions
+
+Contributions are welcome! Please open an issue or submit a pull request.

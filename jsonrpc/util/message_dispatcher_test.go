@@ -1,4 +1,4 @@
-package client
+package util
 
 import (
 	"sync"
@@ -10,38 +10,38 @@ import (
 )
 
 func TestDispatchToChannel(t *testing.T) {
-	messageDispatcher := newMessageDispatcher()
+	messageDispatcher := NewMessageDispatcher()
 
 	req1 := "1"
-	rx := messageDispatcher.register(req1)
+	rx := messageDispatcher.Register(req1)
 
 	req2 := "2"
-	rx2 := messageDispatcher.register(req2)
+	rx2 := messageDispatcher.Register(req2)
 
 	var wg sync.WaitGroup
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 50; i++ {
+		for range 50 {
 			res := message.Response{ID: &req1}
-			err := messageDispatcher.dispatch(req1, res)
+			err := messageDispatcher.Dispatch(req1, res)
 			assert.Nil(t, err)
 		}
 
-		messageDispatcher.unregister(req1)
+		messageDispatcher.Unregister(req1)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 50; i++ {
+		for range 50 {
 			res := message.Response{ID: &req2}
-			err := messageDispatcher.dispatch(req2, res)
+			err := messageDispatcher.Dispatch(req2, res)
 			assert.Nil(t, err)
 		}
 
-		messageDispatcher.unregister(req2)
+		messageDispatcher.Unregister(req2)
 	}()
 
 	var receivedItem atomic.Int32
@@ -67,31 +67,31 @@ func TestDispatchToChannel(t *testing.T) {
 }
 
 func TestUnregisterChannel(t *testing.T) {
-	messageDispatcher := newMessageDispatcher()
+	messageDispatcher := NewMessageDispatcher()
 
 	req := "1"
-	rx := messageDispatcher.register(req)
+	rx := messageDispatcher.Register(req)
 
-	messageDispatcher.unregister(req)
+	messageDispatcher.Unregister(req)
 
 	_, ok := <-rx
 	assert.False(t, ok, "chan closed")
 
-	err := messageDispatcher.dispatch(req, message.Response{ID: &req})
+	err := messageDispatcher.Dispatch(req, message.Response{ID: &req})
 	assert.NotNil(t, err)
 }
 
 func TestClearChannels(t *testing.T) {
-	messageDispatcher := newMessageDispatcher()
+	messageDispatcher := NewMessageDispatcher()
 
 	req := "1"
-	rx := messageDispatcher.register(req)
+	rx := messageDispatcher.Register(req)
 
-	messageDispatcher.clear()
+	messageDispatcher.Close()
 
 	_, ok := <-rx
 	assert.False(t, ok, "chan closed")
 
-	err := messageDispatcher.dispatch(req, message.Response{ID: &req})
+	err := messageDispatcher.Dispatch(req, message.Response{ID: &req})
 	assert.NotNil(t, err)
 }

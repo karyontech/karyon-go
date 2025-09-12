@@ -1,4 +1,4 @@
-package client
+package util
 
 import (
 	"encoding/json"
@@ -11,7 +11,7 @@ import (
 
 func TestSubscriptionsSubscribe(t *testing.T) {
 	bufSize := 100
-	subs := newSubscriptions(bufSize)
+	subs := NewSubscriptions(bufSize)
 
 	var receivedNotifications atomic.Int32
 
@@ -21,10 +21,10 @@ func TestSubscriptionsSubscribe(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for i := 0; i < bufSize; i++ {
+			for i := range bufSize {
 				b, err := json.Marshal(i)
 				assert.Nil(t, err)
-				err = sub.notify(b)
+				err = sub.Notify(b)
 				assert.Nil(t, err)
 			}
 		}()
@@ -46,15 +46,15 @@ func TestSubscriptionsSubscribe(t *testing.T) {
 					break
 				}
 			}
-			sub.stop()
+			sub.Close()
 		}()
 	}
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 3; i++ {
-			sub := subs.subscribe(i)
+		for i := range 3 {
+			sub := subs.Subscribe(i)
 			runSubNotify(sub)
 			runSubRecv(sub)
 		}
@@ -66,21 +66,21 @@ func TestSubscriptionsSubscribe(t *testing.T) {
 
 func TestSubscriptionsUnsubscribe(t *testing.T) {
 	bufSize := 100
-	subs := newSubscriptions(bufSize)
+	subs := NewSubscriptions(bufSize)
 
 	var wg sync.WaitGroup
 
-	sub := subs.subscribe(1)
-	subs.unsubscribe(1)
+	sub := subs.Subscribe(1)
+	subs.Unsubscribe(1)
 
 	_, ok := <-sub.Recv()
 	assert.False(t, ok)
 
 	b, err := json.Marshal(1)
 	assert.Nil(t, err)
-	err = sub.notify(b)
+	err = sub.Notify(b)
 	if assert.Error(t, err) {
-		assert.ErrorIs(t, err, subscriptionIsClosedErr)
+		assert.ErrorIs(t, err, SubscriptionIsClosedErr)
 	}
 
 	wg.Wait()

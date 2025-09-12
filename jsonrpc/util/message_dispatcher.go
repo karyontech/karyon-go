@@ -1,4 +1,4 @@
-package client
+package util
 
 import (
 	"errors"
@@ -11,24 +11,24 @@ var (
 	requestChannelNotFoundErr = errors.New("Request channel not found")
 )
 
-// messageDispatcher Is a structure that holds a map of request IDs and
+// MessageDispatcher Is a structure that holds a map of request IDs and
 // channels, and it is protected by mutex
-type messageDispatcher struct {
+type MessageDispatcher struct {
 	sync.Mutex
 	chans map[message.RequestID]chan<- message.Response
 }
 
-// newMessageDispatcher Creates a new messageDispatcher
-func newMessageDispatcher() *messageDispatcher {
+// NewMessageDispatcher Creates a new MessageDispatcher
+func NewMessageDispatcher() *MessageDispatcher {
 	chans := make(map[message.RequestID]chan<- message.Response)
-	return &messageDispatcher{
+	return &MessageDispatcher{
 		chans: chans,
 	}
 }
 
-// register Registers a new request channel with the given id. It returns a
+// Register Registers a new request channel with the given id. It returns a
 // channel for receiving response.
-func (c *messageDispatcher) register(key message.RequestID) <-chan message.Response {
+func (c *MessageDispatcher) Register(key message.RequestID) <-chan message.Response {
 	c.Lock()
 	defer c.Unlock()
 
@@ -37,8 +37,8 @@ func (c *messageDispatcher) register(key message.RequestID) <-chan message.Respo
 	return ch
 }
 
-// dispatch Disptaches the response to the channel with the given request id
-func (c *messageDispatcher) dispatch(key message.RequestID, res message.Response) error {
+// Dispatch Disptaches the response to the channel with the given request id
+func (c *MessageDispatcher) Dispatch(key message.RequestID, res message.Response) error {
 	c.Lock()
 	defer c.Unlock()
 
@@ -51,8 +51,8 @@ func (c *messageDispatcher) dispatch(key message.RequestID, res message.Response
 	return nil
 }
 
-// unregister Unregisters the request with the provided id
-func (c *messageDispatcher) unregister(key message.RequestID) {
+// Unregister Unregisters the request with the provided id
+func (c *MessageDispatcher) Unregister(key message.RequestID) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -62,8 +62,8 @@ func (c *messageDispatcher) unregister(key message.RequestID) {
 	}
 }
 
-// clear Closes all the request channels and remove them from the map
-func (c *messageDispatcher) clear() {
+// Close Closes all the request channels and remove them from the map
+func (c *MessageDispatcher) Close() {
 	c.Lock()
 	defer c.Unlock()
 

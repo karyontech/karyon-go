@@ -1,4 +1,4 @@
-package client
+package util  
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 )
 
 // queue A concurrent queue.
-type queue[T any] struct {
+type ConcurrentQueue[T any] struct {
 	lock       sync.Mutex
 	cond       *sync.Cond
 	items      []T
@@ -21,9 +21,9 @@ var (
 	queueIsClosedErr = errors.New("Queue is closed")
 )
 
-// newQueue creates a new queue with the specified buffer size.
-func newQueue[T any](bufferSize int) *queue[T] {
-	q := &queue[T]{
+// NewQueue creates a new queue with the specified buffer size.
+func NewConcurrentQueue[T any](bufferSize int) *ConcurrentQueue[T] {
+	q := &ConcurrentQueue[T]{
 		bufferSize: bufferSize,
 		items:      make([]T, 0),
 		stopSignal: make(chan struct{}),
@@ -32,9 +32,9 @@ func newQueue[T any](bufferSize int) *queue[T] {
 	return q
 }
 
-// push Adds a new item to the queue and returns an error if the queue
-// is full.
-func (q *queue[T]) push(item T) error {
+// Push Adds a new item to the queue.
+// Returns an error if the queue is full.
+func (q *ConcurrentQueue[T]) Push(item T) error {
 	if q.isClosed.Load() {
 		return queueIsClosedErr
 	}
@@ -50,11 +50,11 @@ func (q *queue[T]) push(item T) error {
 	return nil
 }
 
-// pop waits for and removes the first element from the queue, then returns it.
-func (q *queue[T]) pop() (T, bool) {
+// Pop waits for and removes the first element from the queue, then returns it.
+func (q *ConcurrentQueue[T]) Pop() (T, error) {
 	var t T
 	if q.isClosed.Load() {
-		return t, false
+		return t, queueIsClosedErr
 	}
 	q.lock.Lock()
 	defer q.lock.Unlock()
@@ -64,7 +64,7 @@ func (q *queue[T]) pop() (T, bool) {
 	for len(q.items) == 0 {
 		select {
 		case <-q.stopSignal:
-			return t, false
+			return t, queueIsClosedErr
 		default:
 			q.cond.Wait()
 		}
@@ -72,11 +72,11 @@ func (q *queue[T]) pop() (T, bool) {
 
 	item := q.items[0]
 	q.items = q.items[1:]
-	return item, true
+	return item, nil
 }
 
-// clear Clears all elements from the queue.
-func (q *queue[T]) clear() {
+// Close Closes all elements from the queue.
+func (q *ConcurrentQueue[T]) Close() {
 	if !q.isClosed.CompareAndSwap(false, true) {
 		return
 	}

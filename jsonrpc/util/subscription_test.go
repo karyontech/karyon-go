@@ -1,4 +1,4 @@
-package client
+package util
 
 import (
 	"encoding/json"
@@ -10,18 +10,18 @@ import (
 
 func TestSubscriptionFullQueue(t *testing.T) {
 	bufSize := 100
-	sub := newSubscription(1, bufSize)
+	sub := NewSubscription(1, bufSize)
 
 	var wg sync.WaitGroup
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		defer sub.stop()
+		defer sub.Close()
 		for i := 0; i < bufSize+10; i++ {
 			b, err := json.Marshal(i)
 			assert.Nil(t, err)
-			err = sub.notify(b)
+			err = sub.Notify(b)
 			if i > bufSize {
 				if assert.Error(t, err) {
 					assert.ErrorIs(t, err, queueIsFullErr)
@@ -35,17 +35,17 @@ func TestSubscriptionFullQueue(t *testing.T) {
 
 func TestSubscriptionRecv(t *testing.T) {
 	bufSize := 100
-	sub := newSubscription(1, bufSize)
+	sub := NewSubscription(1, bufSize)
 
 	var wg sync.WaitGroup
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < bufSize; i++ {
+		for i := range bufSize {
 			b, err := json.Marshal(i)
 			assert.Nil(t, err)
-			err = sub.notify(b)
+			err = sub.Notify(b)
 			assert.Nil(t, err)
 		}
 	}()
@@ -69,18 +69,18 @@ func TestSubscriptionRecv(t *testing.T) {
 	wg.Wait()
 }
 
-func TestSubscriptionStop(t *testing.T) {
-	sub := newSubscription(1, 10)
+func TestSubscriptionClose(t *testing.T) {
+	sub := NewSubscription(1, 10)
 
-	sub.stop()
+	sub.Close()
 
 	_, ok := <-sub.Recv()
 	assert.False(t, ok)
 
 	b, err := json.Marshal(1)
 	assert.Nil(t, err)
-	err = sub.notify(b)
+	err = sub.Notify(b)
 	if assert.Error(t, err) {
-		assert.ErrorIs(t, err, subscriptionIsClosedErr)
+		assert.ErrorIs(t, err, SubscriptionIsClosedErr)
 	}
 }

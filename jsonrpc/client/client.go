@@ -14,6 +14,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/karyontech/karyon-go/jsonrpc/message"
+	"github.com/karyontech/karyon-go/jsonrpc/util"
 )
 
 const (
@@ -46,8 +47,8 @@ type RPCClientConfig struct {
 type RPCClient struct {
 	config        RPCClientConfig
 	conn          *websocket.Conn
-	requests      *messageDispatcher
-	subscriptions *subscriptions
+	requests      *util.MessageDispatcher
+	subscriptions *util.Subscriptions
 	stopSignal    chan struct{}
 	isClosed      atomic.Bool
 }
@@ -71,8 +72,8 @@ func NewRPCClient(config RPCClientConfig) (*RPCClient, error) {
 
 	stopSignal := make(chan struct{})
 
-	requests := newMessageDispatcher()
-	subscriptions := newSubscriptions(config.SubscriptionBufferSize)
+	requests := util.NewMessageDispatcher()
+	subscriptions := util.NewSubscriptions(config.SubscriptionBufferSize)
 
 	client := &RPCClient{
 		conn:          conn,
@@ -108,8 +109,8 @@ func (client *RPCClient) Close() {
 		log.WithError(err).Error("Close websocket connection")
 	}
 
-	client.requests.clear()
-	client.subscriptions.clear()
+	client.requests.Close()
+	client.subscriptions.Close()
 }
 
 // Call Sends an RPC call to the server with the specified method and
@@ -126,7 +127,7 @@ func (client *RPCClient) Call(method string, params any) (json.RawMessage, error
 
 // Subscribe Sends a subscription request to the server with the specified
 // method and parameters, and it returns the subscription.
-func (client *RPCClient) Subscribe(method string, params any) (*Subscription, error) {
+func (client *RPCClient) Subscribe(method string, params any) (*util.Subscription, error) {
 	log.Tracef("Sbuscribe ->  method: %s, params: %v", method, params)
 	response, err := client.sendRequest(method, params)
 	if err != nil {
@@ -143,7 +144,7 @@ func (client *RPCClient) Subscribe(method string, params any) (*Subscription, er
 		return nil, err
 	}
 
-	sub := client.subscriptions.subscribe(subID)
+	sub := client.subscriptions.Subscribe(subID)
 
 	return sub, nil
 }
@@ -158,7 +159,7 @@ func (client *RPCClient) Unsubscribe(method string, subID message.SubscriptionID
 	}
 
 	// On success unsubscribe
-	client.subscriptions.unsubscribe(subID)
+	client.subscriptions.Unsubscribe(subID)
 
 	return nil
 }
@@ -216,7 +217,7 @@ func (client *RPCClient) handleNewMsg(msg []byte) error {
 			return InvalidResponseIDErr
 		}
 
-		err := client.requests.dispatch(*response.ID, response)
+		err := client.requests.Dispatch(*response.ID, response)
 		if err != nil {
 			return fmt.Errorf("Dispatch a response: %w", err)
 		}
@@ -233,7 +234,7 @@ func (client *RPCClient) handleNewMsg(msg []byte) error {
 			return fmt.Errorf("Failed to unmarshal notification params: %w", err)
 		}
 
-		err := client.subscriptions.notify(ntRes.Subscription, ntRes.Result)
+		err := client.subscriptions.Notify(ntRes.Subscription, ntRes.Result)
 		if err != nil {
 			return fmt.Errorf("Notify a subscriber: %w", err)
 		}
@@ -282,8 +283,8 @@ func (client *RPCClient) sendRequest(method string, params any) (message.Respons
 
 	log.Debugf("--> %s", req.String())
 
-	rx_ch := client.requests.register(id)
-	defer client.requests.unregister(id)
+	rx_ch := client.requests.Register(id)
+	defer client.requests.Unregister(id)
 
 	// Waits the response, it fails and return error if it exceed the timeout
 	select {

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	log "github.com/sirupsen/logrus"
+	"log/slog"
 
 	"github.com/karyontech/karyon-go/jsonrpc/message"
 	"github.com/karyontech/karyon-go/jsonrpc/util"
@@ -60,7 +60,7 @@ func NewRPCClient(config RPCClientConfig) (*RPCClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("Successfully connected to the server: %s", config.Addr)
+	slog.Info("Successfully connected to the server", "addr", config.Addr)
 
 	if config.Timeout <= 0 {
 		config.Timeout = DefaultTimeout
@@ -101,14 +101,14 @@ func (client *RPCClient) Close() {
 		return
 	}
 
-	log.Warn("Close the rpc client...")
+	slog.Warn("Close the rpc client...")
 	// Send stop signal to the background receiving loop
 	close(client.stopSignal)
 
 	// Close the underlying websocket connection
 	err := client.conn.Close()
 	if err != nil {
-		log.WithError(err).Error("Close websocket connection")
+		slog.Error("Close websocket connection", "error", err)
 	}
 
 	client.requests.Close()
@@ -118,7 +118,7 @@ func (client *RPCClient) Close() {
 // Call sends a synchronous RPC call to the server with the specified method and parameters.
 // It waits for and returns the response result, or an error if the call fails.
 func (client *RPCClient) Call(method string, params any) (json.RawMessage, error) {
-	log.Tracef("Call -> method: %s, params: %v", method, params)
+	slog.Debug("Call", "method", method, "params", params)
 	response, err := client.sendRequest(method, params)
 	if err != nil {
 		return nil, err
@@ -130,7 +130,7 @@ func (client *RPCClient) Call(method string, params any) (json.RawMessage, error
 // Subscribe sends a subscription request to the server and returns a Subscription object.
 // The subscription can be used to receive notifications from the server for the specified method.
 func (client *RPCClient) Subscribe(method string, params any) (*util.Subscription, error) {
-	log.Tracef("Sbuscribe ->  method: %s, params: %v", method, params)
+	slog.Debug("Subscribe", "method", method, "params", params)
 	response, err := client.sendRequest(method, params)
 	if err != nil {
 		return nil, err
@@ -154,7 +154,7 @@ func (client *RPCClient) Subscribe(method string, params any) (*util.Subscriptio
 // Unsubscribe sends an unsubscription request to the server to cancel the specified subscription.
 // It removes the subscription from the local subscription manager upon successful completion.
 func (client *RPCClient) Unsubscribe(method string, subID message.SubscriptionID) error {
-	log.Tracef("Unsubscribe -> method: %s, subID: %d", method, subID)
+	slog.Debug("Unsubscribe", "method", method, "subID", subID)
 	_, err := client.sendRequest(method, subID)
 	if err != nil {
 		return err
@@ -170,7 +170,7 @@ func (client *RPCClient) Unsubscribe(method string, subID message.SubscriptionID
 // It handles incoming responses and notifications, dispatching them to the appropriate handlers.
 // The loop terminates when a stop signal is received or an error occurs.
 func (client *RPCClient) backgroundReceivingLoop(stopSignal <-chan struct{}) error {
-	log.Debug("Background loop started")
+	slog.Debug("Background loop started")
 
 	newMsgCh := make(chan []byte)
 	receiveErrCh := make(chan error)
@@ -194,15 +194,15 @@ func (client *RPCClient) backgroundReceivingLoop(stopSignal <-chan struct{}) err
 	for {
 		select {
 		case err := <-receiveErrCh:
-			log.WithError(err).Error("Read a new msg")
+			slog.Error("Read a new msg", "error", err)
 			return err
 		case <-stopSignal:
-			log.Debug("Background receiving loop stopped")
+			slog.Debug("Background receiving loop stopped")
 			return nil
 		case msg := <-newMsgCh:
 			err := client.handleNewMsg(msg)
 			if err != nil {
-				log.WithError(err).Error("Handle a msg")
+				slog.Error("Handle a msg", "error", err)
 				return err
 			}
 		}
@@ -244,7 +244,7 @@ func (client *RPCClient) handleNewMsg(msg []byte) error {
 			return fmt.Errorf("Notify a subscriber: %w", err)
 		}
 
-		log.Debugf("<-- %s", notification.String())
+		slog.Debug("<--", "notification", notification.String())
 
 		return nil
 	}
@@ -288,7 +288,7 @@ func (client *RPCClient) sendRequest(method string, params any) (message.Respons
 		return response, err
 	}
 
-	log.Debugf("--> %s", req.String())
+	slog.Debug("-->", "request", req.String())
 
 	rx_ch := client.requests.Register(id)
 	defer client.requests.Unregister(id)
@@ -307,7 +307,7 @@ func (client *RPCClient) sendRequest(method string, params any) (message.Respons
 		return response, err
 	}
 
-	log.Debugf("<-- %s", response.String())
+	slog.Debug("<--", "response", response.String())
 
 	return response, nil
 }

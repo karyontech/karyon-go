@@ -2,11 +2,10 @@ package util
 
 import (
 	"encoding/json"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestSubscriptionsSubscribe(t *testing.T) {
@@ -23,9 +22,13 @@ func TestSubscriptionsSubscribe(t *testing.T) {
 			defer wg.Done()
 			for i := range bufSize {
 				b, err := json.Marshal(i)
-				assert.Nil(t, err)
+				if err != nil {
+					t.Errorf("json.Marshal failed: %v", err)
+				}
 				err = sub.Notify(b)
-				assert.Nil(t, err)
+				if err != nil {
+					t.Errorf("sub.Notify failed: %v", err)
+				}
 			}
 		}()
 	}
@@ -38,8 +41,12 @@ func TestSubscriptionsSubscribe(t *testing.T) {
 			for nt := range sub.Recv() {
 				var v int
 				err := json.Unmarshal(nt, &v)
-				assert.Nil(t, err)
-				assert.Equal(t, v, i)
+				if err != nil {
+					t.Errorf("json.Unmarshal failed: %v", err)
+				}
+				if v != i {
+					t.Errorf("expected %d, got %d", i, v)
+				}
 				receivedNotifications.Add(1)
 				i += 1
 				if i == bufSize {
@@ -61,7 +68,10 @@ func TestSubscriptionsSubscribe(t *testing.T) {
 	}()
 
 	wg.Wait()
-	assert.Equal(t, receivedNotifications.Load(), int32(bufSize*3))
+	expected := int32(bufSize * 3)
+	if receivedNotifications.Load() != expected {
+		t.Fatalf("expected %d notifications, got %d", expected, receivedNotifications.Load())
+	}
 }
 
 func TestSubscriptionsUnsubscribe(t *testing.T) {
@@ -74,13 +84,20 @@ func TestSubscriptionsUnsubscribe(t *testing.T) {
 	subs.Unsubscribe(1)
 
 	_, ok := <-sub.Recv()
-	assert.False(t, ok)
+	if ok {
+		t.Fatal("expected channel to be closed")
+	}
 
 	b, err := json.Marshal(1)
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("json.Marshal failed: %v", err)
+	}
 	err = sub.Notify(b)
-	if assert.Error(t, err) {
-		assert.ErrorIs(t, err, SubscriptionIsClosedError)
+	if err == nil {
+		t.Fatal("expected error when notifying closed subscription")
+	}
+	if !errors.Is(err, SubscriptionIsClosedError) {
+		t.Fatalf("expected SubscriptionIsClosedError, got %v", err)
 	}
 
 	wg.Wait()

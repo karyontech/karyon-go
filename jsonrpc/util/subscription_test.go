@@ -2,10 +2,9 @@ package util
 
 import (
 	"encoding/json"
+	"errors"
 	"sync"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestSubscriptionFullQueue(t *testing.T) {
@@ -20,11 +19,16 @@ func TestSubscriptionFullQueue(t *testing.T) {
 		defer sub.Close()
 		for i := 0; i < bufSize+10; i++ {
 			b, err := json.Marshal(i)
-			assert.Nil(t, err)
+			if err != nil {
+				t.Errorf("json.Marshal failed: %v", err)
+			}
 			err = sub.Notify(b)
 			if i > bufSize {
-				if assert.Error(t, err) {
-					assert.ErrorIs(t, err, QueueIsFullError)
+				if err == nil {
+					t.Error("expected error when queue is full")
+				}
+				if !errors.Is(err, QueueIsFullError) {
+					t.Errorf("expected QueueIsFullError, got %v", err)
 				}
 			}
 		}
@@ -44,9 +48,13 @@ func TestSubscriptionRecv(t *testing.T) {
 		defer wg.Done()
 		for i := range bufSize {
 			b, err := json.Marshal(i)
-			assert.Nil(t, err)
+			if err != nil {
+				t.Errorf("json.Marshal failed: %v", err)
+			}
 			err = sub.Notify(b)
-			assert.Nil(t, err)
+			if err != nil {
+				t.Errorf("sub.Notify failed: %v", err)
+			}
 		}
 	}()
 
@@ -57,8 +65,12 @@ func TestSubscriptionRecv(t *testing.T) {
 		for nt := range sub.Recv() {
 			var v int
 			err := json.Unmarshal(nt, &v)
-			assert.Nil(t, err)
-			assert.Equal(t, v, i)
+			if err != nil {
+				t.Errorf("json.Unmarshal failed: %v", err)
+			}
+			if v != i {
+				t.Errorf("expected %d, got %d", i, v)
+			}
 			i += 1
 			if i == bufSize {
 				break
@@ -75,12 +87,19 @@ func TestSubscriptionClose(t *testing.T) {
 	sub.Close()
 
 	_, ok := <-sub.Recv()
-	assert.False(t, ok)
+	if ok {
+		t.Fatal("expected channel to be closed")
+	}
 
 	b, err := json.Marshal(1)
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("json.Marshal failed: %v", err)
+	}
 	err = sub.Notify(b)
-	if assert.Error(t, err) {
-		assert.ErrorIs(t, err, SubscriptionIsClosedError)
+	if err == nil {
+		t.Fatal("expected error when notifying closed subscription")
+	}
+	if !errors.Is(err, SubscriptionIsClosedError) {
+		t.Fatalf("expected SubscriptionIsClosedError, got %v", err)
 	}
 }

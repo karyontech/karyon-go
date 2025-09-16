@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/karyontech/karyon-go/jsonrpc/message"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestDispatchToChannel(t *testing.T) {
@@ -26,7 +25,9 @@ func TestDispatchToChannel(t *testing.T) {
 		for range 50 {
 			res := message.Response{ID: &req1}
 			err := messageDispatcher.Dispatch(req1, res)
-			assert.Nil(t, err)
+			if err != nil {
+				t.Errorf("Dispatch failed: %v", err)
+			}
 		}
 
 		messageDispatcher.Unregister(req1)
@@ -38,7 +39,9 @@ func TestDispatchToChannel(t *testing.T) {
 		for range 50 {
 			res := message.Response{ID: &req2}
 			err := messageDispatcher.Dispatch(req2, res)
-			assert.Nil(t, err)
+			if err != nil {
+				t.Errorf("Dispatch failed: %v", err)
+			}
 		}
 
 		messageDispatcher.Unregister(req2)
@@ -63,7 +66,10 @@ func TestDispatchToChannel(t *testing.T) {
 	}()
 
 	wg.Wait()
-	assert.Equal(t, receivedItem.Load(), int32(100))
+	expected := int32(100)
+	if receivedItem.Load() != expected {
+		t.Fatalf("expected %d received items, got %d", expected, receivedItem.Load())
+	}
 }
 
 func TestUnregisterChannel(t *testing.T) {
@@ -75,10 +81,14 @@ func TestUnregisterChannel(t *testing.T) {
 	messageDispatcher.Unregister(req)
 
 	_, ok := <-rx
-	assert.False(t, ok, "chan closed")
+	if ok {
+		t.Fatal("expected channel to be closed")
+	}
 
 	err := messageDispatcher.Dispatch(req, message.Response{ID: &req})
-	assert.NotNil(t, err)
+	if err == nil {
+		t.Fatal("expected error when dispatching to unregistered channel")
+	}
 }
 
 func TestClearChannels(t *testing.T) {
@@ -90,8 +100,12 @@ func TestClearChannels(t *testing.T) {
 	messageDispatcher.Close()
 
 	_, ok := <-rx
-	assert.False(t, ok, "chan closed")
+	if ok {
+		t.Fatal("expected channel to be closed")
+	}
 
 	err := messageDispatcher.Dispatch(req, message.Response{ID: &req})
-	assert.NotNil(t, err)
+	if err == nil {
+		t.Fatal("expected error when dispatching to unregistered channel")
+	}
 }

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	log "github.com/sirupsen/logrus"
+	"log/slog"
 
 	"github.com/karyontech/karyon-go/jsonrpc/message"
 )
@@ -50,11 +50,11 @@ func (s *Subscription) Recv() <-chan json.RawMessage {
 // The job stops when it receives a stop signal or encounters an error.
 func (s *Subscription) startBackgroundJob() {
 	go func() {
-		logger := log.WithField("Subscription", s.ID)
+		logger := slog.With("Subscription", s.ID)
 		for {
 			msg, err := s.queue.Pop()
 			if err != nil {
-				logger.WithError(err).Error("Background job stopped")
+				logger.Error("Background job stopped", "error", err)
 				return
 			}
 			select {

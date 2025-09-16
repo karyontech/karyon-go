@@ -26,7 +26,8 @@ type Subscription struct {
 	isClosed   atomic.Bool
 }
 
-// newSubscription Creates a new Subscription
+// NewSubscription creates a new Subscription with the specified subscription ID and buffer size.
+// It initializes the subscription channels and queue, and starts a background job to handle notifications.
 func NewSubscription(subID message.SubscriptionID, bufferSize int) *Subscription {
 	sub := &Subscription{
 		ch:         make(chan json.RawMessage),
@@ -39,13 +40,15 @@ func NewSubscription(subID message.SubscriptionID, bufferSize int) *Subscription
 	return sub
 }
 
-// Recv Receives a new notification.
+// Recv returns a receive-only channel for reading notifications from the subscription.
+// This channel will receive notifications as they are processed from the internal queue.
 func (s *Subscription) Recv() <-chan json.RawMessage {
 	return s.ch
 }
 
-// startBackgroundJob starts waiting for the queue to receive new items.
-// It stops when it receives a stop signal.
+// startBackgroundJob starts a goroutine that continuously processes notifications from the queue.
+// It waits for items to be available in the queue and forwards them to the subscription channel.
+// The job stops when it receives a stop signal or encounters an error.
 func (s *Subscription) startBackgroundJob() {
 	go func() {
 		logger := log.WithField("Subscription", s.ID)
@@ -65,7 +68,8 @@ func (s *Subscription) startBackgroundJob() {
 	}()
 }
 
-// Notify adds a new notification to the queue.
+// Notify adds a new notification to the subscription's queue for processing.
+// It returns an error if the subscription is closed or if the queue is full.
 func (s *Subscription) Notify(nt json.RawMessage) error {
 	if s.isClosed.Load() {
 		return SubscriptionIsClosedErr
@@ -76,7 +80,8 @@ func (s *Subscription) Notify(nt json.RawMessage) error {
 	return nil
 }
 
-// Close Terminates the subscription, closes the queue, and closes channels.
+// Close terminates the subscription by stopping the background job, closing channels, and cleaning up resources.
+// It ensures that the subscription can only be closed once using atomic operations.
 func (s *Subscription) Close() {
 	if !s.isClosed.CompareAndSwap(false, true) {
 		return

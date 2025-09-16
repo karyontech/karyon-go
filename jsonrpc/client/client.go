@@ -53,8 +53,9 @@ type RPCClient struct {
 	isClosed      atomic.Bool
 }
 
-// NewRPCClient Creates a new instance of RPCClient with the provided configuration.
-// It establishes a WebSocket connection to the RPC server.
+// NewRPCClient creates a new instance of RPCClient with the provided configuration.
+// It establishes a WebSocket connection to the RPC server and starts a background receiving loop.
+// Returns an error if the connection cannot be established.
 func NewRPCClient(config RPCClientConfig) (*RPCClient, error) {
 	conn, _, err := websocket.DefaultDialer.Dial(config.Addr, nil)
 	if err != nil {
@@ -92,7 +93,9 @@ func NewRPCClient(config RPCClientConfig) (*RPCClient, error) {
 	return client, nil
 }
 
-// Close Closes the underlying websocket connection and stop the receiving loop.
+// Close gracefully shuts down the RPC client by closing the WebSocket connection,
+// stopping the background receiving loop, and cleaning up all resources.
+// It ensures the client can only be closed once using atomic operations.
 func (client *RPCClient) Close() {
 	// Check if it's already closed
 	if !client.isClosed.CompareAndSwap(false, true) {
@@ -113,8 +116,8 @@ func (client *RPCClient) Close() {
 	client.subscriptions.Close()
 }
 
-// Call Sends an RPC call to the server with the specified method and
-// parameters, and returns the response.
+// Call sends a synchronous RPC call to the server with the specified method and parameters.
+// It waits for and returns the response result, or an error if the call fails.
 func (client *RPCClient) Call(method string, params any) (json.RawMessage, error) {
 	log.Tracef("Call -> method: %s, params: %v", method, params)
 	response, err := client.sendRequest(method, params)
@@ -125,8 +128,8 @@ func (client *RPCClient) Call(method string, params any) (json.RawMessage, error
 	return response.Result, nil
 }
 
-// Subscribe Sends a subscription request to the server with the specified
-// method and parameters, and it returns the subscription.
+// Subscribe sends a subscription request to the server and returns a Subscription object.
+// The subscription can be used to receive notifications from the server for the specified method.
 func (client *RPCClient) Subscribe(method string, params any) (*util.Subscription, error) {
 	log.Tracef("Sbuscribe ->  method: %s, params: %v", method, params)
 	response, err := client.sendRequest(method, params)
@@ -149,8 +152,8 @@ func (client *RPCClient) Subscribe(method string, params any) (*util.Subscriptio
 	return sub, nil
 }
 
-// Unsubscribe Sends an unsubscription request to the server to cancel the
-// given subscription.
+// Unsubscribe sends an unsubscription request to the server to cancel the specified subscription.
+// It removes the subscription from the local subscription manager upon successful completion.
 func (client *RPCClient) Unsubscribe(method string, subID message.SubscriptionID) error {
 	log.Tracef("Unsubscribe -> method: %s, subID: %d", method, subID)
 	_, err := client.sendRequest(method, subID)
@@ -164,7 +167,9 @@ func (client *RPCClient) Unsubscribe(method string, subID message.SubscriptionID
 	return nil
 }
 
-// backgroundReceivingLoop Starts reading new messages from the underlying connection.
+// backgroundReceivingLoop continuously reads messages from the WebSocket connection in a separate goroutine.
+// It handles incoming responses and notifications, dispatching them to the appropriate handlers.
+// The loop terminates when a stop signal is received or an error occurs.
 func (client *RPCClient) backgroundReceivingLoop(stopSignal <-chan struct{}) error {
 	log.Debug("Background loop started")
 
@@ -205,8 +210,9 @@ func (client *RPCClient) backgroundReceivingLoop(stopSignal <-chan struct{}) err
 	}
 }
 
-// handleNewMsg Attempts to decode the received message into either a Response
-// or Notification.
+// handleNewMsg processes incoming messages by attempting to decode them as either Response or Notification.
+// For responses, it dispatches them to waiting request handlers. For notifications, it forwards them to subscribers.
+// Returns an error if the message cannot be processed or is malformed.
 func (client *RPCClient) handleNewMsg(msg []byte) error {
 	// Check if the received message is of type Response
 	response := message.Response{}
@@ -247,7 +253,9 @@ func (client *RPCClient) handleNewMsg(msg []byte) error {
 	return fmt.Errorf("Receive unexpected msg: %s", msg)
 }
 
-// sendRequest Sends a request and wait for the response
+// sendRequest sends a JSON-RPC request to the server and waits for the response.
+// It generates a unique request ID, marshals the request, sends it over WebSocket, and waits for a response.
+// Returns an error if the client is disconnected, marshaling fails, or a timeout occurs.
 func (client *RPCClient) sendRequest(method string, params any) (message.Response, error) {
 	response := message.Response{}
 
@@ -305,8 +313,8 @@ func (client *RPCClient) sendRequest(method string, params any) (message.Respons
 	return response, nil
 }
 
-// validateResponse Checks the error field and whether the request id is the
-// same as the response id
+// validateResponse verifies that the response is valid by checking for errors and ensuring the response ID matches the request ID.
+// It returns an error if the response contains an error field or if the response ID doesn't match the request ID.
 func validateResponse(res *message.Response, reqID message.RequestID) error {
 	if res.Error != nil {
 		return fmt.Errorf("Receive An Error: %s", res.Error.String())

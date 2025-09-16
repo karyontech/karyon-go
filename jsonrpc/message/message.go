@@ -52,18 +52,26 @@ type Error struct {
 	Data    json.RawMessage `json:"data,omitempty"` // Optional additional data about the error.
 }
 
+// String returns a string representation of the Request struct for debugging and logging purposes.
+// It formats the JSON-RPC version, ID, method name, and parameters into a readable string.
 func (req *Request) String() string {
 	return fmt.Sprintf("{JSONRPC: %s, ID: %s, METHOD: %s, PARAMS: %s}", req.JSONRPC, req.ID, req.Method, *req.Params)
 }
 
+// String returns a string representation of the Response struct for debugging and logging purposes.
+// It formats the JSON-RPC version, ID, result, and error into a readable string.
 func (res *Response) String() string {
 	return fmt.Sprintf("{JSONRPC: %s, ID: %v, RESULT: %v, ERROR: %v}", res.JSONRPC, res.ID, res.Result, res.Error)
 }
 
+// String returns a string representation of the Notification struct for debugging and logging purposes.
+// It formats the JSON-RPC version, method name, and parameters into a readable string.
 func (nt *Notification) String() string {
 	return fmt.Sprintf("{JSONRPC: %s, METHOD: %s, PARAMS: %s}", nt.JSONRPC, nt.Method, nt.Params)
 }
 
+// String returns a string representation of the Error struct for debugging and logging purposes.
+// It formats the error code, message, and additional data into a readable string.
 func (err *Error) String() string {
 	return fmt.Sprintf("{CODE: %d, MESSAGE: %s, DATA: %b}", err.Code, err.Message, err.Data)
 }

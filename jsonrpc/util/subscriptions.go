@@ -20,7 +20,8 @@ type Subscriptions struct {
 	bufferSize int
 }
 
-// NewSubscriptions Creates a new Subscriptions
+// NewSubscriptions creates a new Subscriptions manager with the specified buffer size for each subscription.
+// It initializes an empty map to store subscription IDs and their corresponding Subscription objects.
 func NewSubscriptions(bufferSize int) *Subscriptions {
 	subs := make(map[message.SubscriptionID]*Subscription)
 	return &Subscriptions{
@@ -29,7 +30,8 @@ func NewSubscriptions(bufferSize int) *Subscriptions {
 	}
 }
 
-// Subscribe Subscribes and returns a Subscription.
+// Subscribe creates a new subscription with the given ID and adds it to the manager.
+// It returns the newly created Subscription object that can be used to receive notifications.
 func (c *Subscriptions) Subscribe(key message.SubscriptionID) *Subscription {
 	c.Lock()
 	defer c.Unlock()
@@ -39,7 +41,8 @@ func (c *Subscriptions) Subscribe(key message.SubscriptionID) *Subscription {
 	return sub
 }
 
-// Notify Notifies the msg the subscription with the given id
+// Notify sends a message to the subscription with the specified ID.
+// It returns an error if the subscription is not found or if the notification fails.
 func (c *Subscriptions) Notify(key message.SubscriptionID, msg json.RawMessage) error {
 	c.Lock()
 	defer c.Unlock()
@@ -59,7 +62,8 @@ func (c *Subscriptions) Notify(key message.SubscriptionID, msg json.RawMessage) 
 	return nil
 }
 
-// Unsubscribe Unsubscribe from the subscription with the provided id
+// Unsubscribe removes and closes the subscription with the specified ID.
+// It safely handles the case where the subscription doesn't exist.
 func (c *Subscriptions) Unsubscribe(key message.SubscriptionID) {
 	c.Lock()
 	defer c.Unlock()
@@ -69,7 +73,8 @@ func (c *Subscriptions) Unsubscribe(key message.SubscriptionID) {
 	}
 }
 
-// Close Stops all the Subscriptions and remove them from the map
+// Close terminates all active subscriptions and cleans up the subscription map.
+// It ensures all resources are properly released when the manager is no longer needed.
 func (c *Subscriptions) Close() {
 	c.Lock()
 	defer c.Unlock()

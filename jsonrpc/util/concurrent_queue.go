@@ -21,7 +21,8 @@ var (
 	queueIsClosedErr = errors.New("Queue is closed")
 )
 
-// NewQueue creates a new queue with the specified buffer size.
+// NewConcurrentQueue creates a new concurrent queue with the specified buffer size.
+// It initializes the queue with empty items slice and sets up synchronization primitives.
 func NewConcurrentQueue[T any](bufferSize int) *ConcurrentQueue[T] {
 	q := &ConcurrentQueue[T]{
 		bufferSize: bufferSize,
@@ -32,8 +33,8 @@ func NewConcurrentQueue[T any](bufferSize int) *ConcurrentQueue[T] {
 	return q
 }
 
-// Push Adds a new item to the queue.
-// Returns an error if the queue is full.
+// Push adds a new item to the end of the queue.
+// It returns an error if the queue is full or closed.
 func (q *ConcurrentQueue[T]) Push(item T) error {
 	if q.isClosed.Load() {
 		return queueIsClosedErr
@@ -50,7 +51,8 @@ func (q *ConcurrentQueue[T]) Push(item T) error {
 	return nil
 }
 
-// Pop waits for and removes the first element from the queue, then returns it.
+// Pop waits for and removes the first element from the queue.
+// It blocks until an item is available or the queue is closed, then returns the item.
 func (q *ConcurrentQueue[T]) Pop() (T, error) {
 	var t T
 	if q.isClosed.Load() {
@@ -75,7 +77,8 @@ func (q *ConcurrentQueue[T]) Pop() (T, error) {
 	return item, nil
 }
 
-// Close Closes all elements from the queue.
+// Close terminates the queue and releases all resources.
+// It marks the queue as closed, clears all items, and wakes up any waiting goroutines.
 func (q *ConcurrentQueue[T]) Close() {
 	if !q.isClosed.CompareAndSwap(false, true) {
 		return

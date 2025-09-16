@@ -18,7 +18,8 @@ type MessageDispatcher struct {
 	chans map[message.RequestID]chan<- message.Response
 }
 
-// NewMessageDispatcher Creates a new MessageDispatcher
+// NewMessageDispatcher creates a new MessageDispatcher with an empty channel map.
+// It initializes the internal map for storing request ID to response channel mappings.
 func NewMessageDispatcher() *MessageDispatcher {
 	chans := make(map[message.RequestID]chan<- message.Response)
 	return &MessageDispatcher{
@@ -26,8 +27,8 @@ func NewMessageDispatcher() *MessageDispatcher {
 	}
 }
 
-// Register Registers a new request channel with the given id. It returns a
-// channel for receiving response.
+// Register creates and registers a new response channel for the given request ID.
+// It returns a receive-only channel that will receive the response when it arrives.
 func (c *MessageDispatcher) Register(key message.RequestID) <-chan message.Response {
 	c.Lock()
 	defer c.Unlock()
@@ -37,7 +38,8 @@ func (c *MessageDispatcher) Register(key message.RequestID) <-chan message.Respo
 	return ch
 }
 
-// Dispatch Disptaches the response to the channel with the given request id
+// Dispatch sends the response to the channel associated with the given request ID.
+// It returns an error if no channel is found for the request ID.
 func (c *MessageDispatcher) Dispatch(key message.RequestID, res message.Response) error {
 	c.Lock()
 	defer c.Unlock()
@@ -51,7 +53,8 @@ func (c *MessageDispatcher) Dispatch(key message.RequestID, res message.Response
 	return nil
 }
 
-// Unregister Unregisters the request with the provided id
+// Unregister removes and closes the response channel for the given request ID.
+// It safely handles the case where the request ID doesn't exist.
 func (c *MessageDispatcher) Unregister(key message.RequestID) {
 	c.Lock()
 	defer c.Unlock()
@@ -62,7 +65,8 @@ func (c *MessageDispatcher) Unregister(key message.RequestID) {
 	}
 }
 
-// Close Closes all the request channels and remove them from the map
+// Close terminates all active request channels and cleans up the dispatcher map.
+// It ensures all resources are properly released when the dispatcher is no longer needed.
 func (c *MessageDispatcher) Close() {
 	c.Lock()
 	defer c.Unlock()

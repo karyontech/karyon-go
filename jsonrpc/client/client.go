@@ -6,12 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"net/url"
 	"strconv"
 	"sync/atomic"
 	"time"
-
-	"github.com/gorilla/websocket"
 	"log/slog"
+
+	"golang.org/x/net/websocket"
 
 	"github.com/karyontech/karyon-go/jsonrpc/message"
 	"github.com/karyontech/karyon-go/jsonrpc/util"
@@ -56,7 +57,12 @@ type RPCClient struct {
 // It establishes a WebSocket connection to the RPC server and starts a background receiving loop.
 // Returns an error if the connection cannot be established.
 func NewRPCClient(config RPCClientConfig) (*RPCClient, error) {
-	conn, _, err := websocket.DefaultDialer.Dial(config.Addr, nil)
+	u, err := url.Parse(config.Addr)
+	if err != nil {
+		return nil, err
+	}
+	origin := "http://localhost/"
+	conn, err := websocket.Dial(u.String(), "", origin)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +184,8 @@ func (client *RPCClient) backgroundReceivingLoop(stopSignal <-chan struct{}) err
 	// Start listing for new messages
 	go func() {
 		for {
-			_, msg, err := client.conn.ReadMessage()
+			var msg []byte
+			err := websocket.Message.Receive(client.conn, &msg)
 			if err != nil {
 				receiveErrCh <- err
 				return
@@ -283,7 +290,7 @@ func (client *RPCClient) sendRequest(method string, params any) (message.Respons
 		return response, err
 	}
 
-	err = client.conn.WriteMessage(websocket.TextMessage, []byte(string(reqJSON)))
+	err = websocket.Message.Send(client.conn, string(reqJSON))
 	if err != nil {
 		return response, err
 	}

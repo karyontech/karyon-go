@@ -1,5 +1,7 @@
 module github.com/karyontech/karyon-go
 
-go 1.22
+go 1.24.0
 
-require github.com/gorilla/websocket v1.5.3
+toolchain go1.24.6
+
+require golang.org/x/net v0.44.0

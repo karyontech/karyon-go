@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sync/atomic"
-
 	"log/slog"
 
 	"github.com/karyontech/karyon-go/jsonrpc/message"
@@ -59,7 +58,7 @@ func (s *Subscription) startBackgroundJob() {
 			}
 			select {
 			case <-s.stopSignal:
-				logger.Debug("Background job stopped")
+				logger.Debug("Background job stopped receive a stop signal")
 				return
 			case s.ch <- msg:
 			}

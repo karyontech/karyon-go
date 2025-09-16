@@ -12,9 +12,8 @@ import (
 )
 
 var (
-	SubscriptionIsClosedErr = errors.New("Subscription is closed")
-	// TODO
-	receivedStopSignalErr   = errors.New("Received stop signal")
+	SubscriptionIsClosedError = errors.New("Subscription is closed")
+	SubscriptionNotFoundError = errors.New("Subscription not found")
 )
 
 // Subscription A subscription established when the client's subscribe to a method
@@ -60,7 +59,7 @@ func (s *Subscription) startBackgroundJob() {
 			}
 			select {
 			case <-s.stopSignal:
-				logger.Debug("Background job stopped: %w", receivedStopSignalErr)
+				logger.Debug("Background job stopped")
 				return
 			case s.ch <- msg:
 			}
@@ -72,7 +71,7 @@ func (s *Subscription) startBackgroundJob() {
 // It returns an error if the subscription is closed or if the queue is full.
 func (s *Subscription) Notify(nt json.RawMessage) error {
 	if s.isClosed.Load() {
-		return SubscriptionIsClosedErr
+		return SubscriptionIsClosedError
 	}
 	if err := s.queue.Push(nt); err != nil {
 		return fmt.Errorf("Unable to push new notification: %w", err)

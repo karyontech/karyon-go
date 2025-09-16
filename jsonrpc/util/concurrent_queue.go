@@ -1,4 +1,4 @@
-package util  
+package util
 
 import (
 	"errors"
@@ -17,8 +17,8 @@ type ConcurrentQueue[T any] struct {
 }
 
 var (
-	queueIsFullErr   = errors.New("Queue is full")
-	queueIsClosedErr = errors.New("Queue is closed")
+	QueueIsFullError   = errors.New("Queue is full")
+	QueueIsClosedError = errors.New("Queue is closed")
 )
 
 // NewConcurrentQueue creates a new concurrent queue with the specified buffer size.
@@ -37,13 +37,13 @@ func NewConcurrentQueue[T any](bufferSize int) *ConcurrentQueue[T] {
 // It returns an error if the queue is full or closed.
 func (q *ConcurrentQueue[T]) Push(item T) error {
 	if q.isClosed.Load() {
-		return queueIsClosedErr
+		return QueueIsClosedError
 	}
-
 	q.lock.Lock()
 	defer q.lock.Unlock()
+
 	if len(q.items) >= q.bufferSize {
-		return queueIsFullErr
+		return QueueIsFullError
 	}
 
 	q.items = append(q.items, item)
@@ -56,7 +56,7 @@ func (q *ConcurrentQueue[T]) Push(item T) error {
 func (q *ConcurrentQueue[T]) Pop() (T, error) {
 	var t T
 	if q.isClosed.Load() {
-		return t, queueIsClosedErr
+		return t, QueueIsClosedError
 	}
 	q.lock.Lock()
 	defer q.lock.Unlock()
@@ -66,7 +66,7 @@ func (q *ConcurrentQueue[T]) Pop() (T, error) {
 	for len(q.items) == 0 {
 		select {
 		case <-q.stopSignal:
-			return t, queueIsClosedErr
+			return t, QueueIsClosedError
 		default:
 			q.cond.Wait()
 		}
@@ -80,11 +80,12 @@ func (q *ConcurrentQueue[T]) Pop() (T, error) {
 // Close terminates the queue and releases all resources.
 // It marks the queue as closed, clears all items, and wakes up any waiting goroutines.
 func (q *ConcurrentQueue[T]) Close() {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
 	if !q.isClosed.CompareAndSwap(false, true) {
 		return
 	}
-	q.lock.Lock()
-	defer q.lock.Unlock()
 	close(q.stopSignal)
 	q.items = nil
 	q.cond.Broadcast()

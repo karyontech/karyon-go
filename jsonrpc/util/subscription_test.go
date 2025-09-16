@@ -24,7 +24,7 @@ func TestSubscriptionFullQueue(t *testing.T) {
 			err = sub.Notify(b)
 			if i > bufSize {
 				if assert.Error(t, err) {
-					assert.ErrorIs(t, err, queueIsFullErr)
+					assert.ErrorIs(t, err, QueueIsFullError)
 				}
 			}
 		}
@@ -81,6 +81,6 @@ func TestSubscriptionClose(t *testing.T) {
 	assert.Nil(t, err)
 	err = sub.Notify(b)
 	if assert.Error(t, err) {
-		assert.ErrorIs(t, err, SubscriptionIsClosedErr)
+		assert.ErrorIs(t, err, SubscriptionIsClosedError)
 	}
 }

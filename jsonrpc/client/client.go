@@ -29,11 +29,10 @@ const (
 )
 
 var (
-	ClientIsDisconnectedErr  = errors.New("Client is disconnected and closed")
-	TimeoutError             = errors.New("Timeout Error")
-	InvalidResponseIDErr     = errors.New("Invalid response ID")
-	InvalidResponseResultErr = errors.New("Invalid response result")
-	receivedStopSignalErr    = errors.New("Received stop signal")
+	ClientIsDisconnectedError  = errors.New("Client is disconnected and closed")
+	TimeoutError               = errors.New("Timeout Error")
+	InvalidResponseIDError     = errors.New("Invalid response ID")
+	InvalidResponseResultError = errors.New("Invalid response result")
 )
 
 // RPCClientConfig Holds the configuration settings for the RPC client.
@@ -138,7 +137,7 @@ func (client *RPCClient) Subscribe(method string, params any) (*util.Subscriptio
 	}
 
 	if response.Result == nil {
-		return nil, InvalidResponseResultErr
+		return nil, InvalidResponseResultError
 	}
 
 	var subID message.SubscriptionID
@@ -198,7 +197,7 @@ func (client *RPCClient) backgroundReceivingLoop(stopSignal <-chan struct{}) err
 			log.WithError(err).Error("Read a new msg")
 			return err
 		case <-stopSignal:
-			log.Debug("Background receiving loop stopped %w", receivedStopSignalErr)
+			log.Debug("Background receiving loop stopped")
 			return nil
 		case msg := <-newMsgCh:
 			err := client.handleNewMsg(msg)
@@ -220,7 +219,7 @@ func (client *RPCClient) handleNewMsg(msg []byte) error {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&response); err == nil {
 		if response.ID == nil {
-			return InvalidResponseIDErr
+			return InvalidResponseIDError
 		}
 
 		err := client.requests.Dispatch(*response.ID, response)
@@ -260,7 +259,7 @@ func (client *RPCClient) sendRequest(method string, params any) (message.Respons
 	response := message.Response{}
 
 	if client.isClosed.Load() {
-		return response, ClientIsDisconnectedErr
+		return response, ClientIsDisconnectedError
 	}
 
 	params_bytes, err := json.Marshal(params)
@@ -298,7 +297,7 @@ func (client *RPCClient) sendRequest(method string, params any) (message.Respons
 	select {
 	case response = <-rx_ch:
 	case <-client.stopSignal:
-		return response, ClientIsDisconnectedErr
+		return response, ClientIsDisconnectedError
 	case <-time.After(time.Duration(client.config.Timeout) * time.Millisecond):
 		return response, TimeoutError
 	}
@@ -322,7 +321,7 @@ func validateResponse(res *message.Response, reqID message.RequestID) error {
 
 	if res.ID != nil {
 		if *res.ID != reqID {
-			return InvalidResponseIDErr
+			return InvalidResponseIDError
 		}
 	}
 

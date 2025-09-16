@@ -1,15 +1,10 @@
-package util 
+package util
 
 import (
 	"encoding/json"
-	"errors"
 	"sync"
 
 	"github.com/karyontech/karyon-go/jsonrpc/message"
-)
-
-var (
-	subscriptionNotFoundErr = errors.New("Subscription not found")
 )
 
 // Subscriptions Is a structure that holds a map of subscription IDs and
@@ -50,7 +45,7 @@ func (c *Subscriptions) Notify(key message.SubscriptionID, msg json.RawMessage) 
 	sub, ok := c.subs[key]
 
 	if !ok {
-		return subscriptionNotFoundErr
+		return SubscriptionNotFoundError
 	}
 
 	err := sub.Notify(msg)

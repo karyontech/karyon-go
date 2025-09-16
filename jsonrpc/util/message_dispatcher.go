@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	requestChannelNotFoundErr = errors.New("Request channel not found")
+	ChannelNotFoundError = errors.New("Request channel not found")
 )
 
 // MessageDispatcher Is a structure that holds a map of request IDs and
@@ -47,7 +47,7 @@ func (c *MessageDispatcher) Dispatch(key message.RequestID, res message.Response
 	if ch, ok := c.chans[key]; ok {
 		ch <- res
 	} else {
-		return requestChannelNotFoundErr
+		return ChannelNotFoundError
 	}
 
 	return nil

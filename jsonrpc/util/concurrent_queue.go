@@ -80,12 +80,13 @@ func (q *ConcurrentQueue[T]) Pop() (T, error) {
 // Close terminates the queue and releases all resources.
 // It marks the queue as closed, clears all items, and wakes up any waiting goroutines.
 func (q *ConcurrentQueue[T]) Close() {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-
 	if !q.isClosed.CompareAndSwap(false, true) {
 		return
 	}
+
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
 	close(q.stopSignal)
 	q.items = nil
 	q.cond.Broadcast()

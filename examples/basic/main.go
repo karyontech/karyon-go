@@ -12,8 +12,8 @@ import (
 func main() {
 
 	config := rpc.RPCClientConfig{
-		// Addr: "ws://localhost:7000/",
-		Addr: "tcp://localhost:7000/",
+		Addr: "ws://localhost:7000/",
+		// Addr: "tcp://localhost:7000/",
 	}
 
 	client, err := rpc.NewRPCClient(config)

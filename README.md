@@ -16,9 +16,9 @@ package main
 
 import (
 	"fmt"
-	"time"
 	"log/slog"
 	"os"
+	"time"
 
 	rpc "github.com/karyontech/karyon-go/jsonrpc/client"
 )
@@ -27,6 +27,7 @@ func main() {
 
 	config := rpc.RPCClientConfig{
 		Addr: "ws://localhost:7000/",
+		// Addr: "tcp://localhost:7000/",
 	}
 
 	client, err := rpc.NewRPCClient(config)
@@ -61,7 +62,6 @@ func main() {
 	fmt.Printf("Receive a pong msg: %s", msg)
 
 }
-
 ```
 
 ## License

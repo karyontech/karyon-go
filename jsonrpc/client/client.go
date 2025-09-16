@@ -206,6 +206,7 @@ func (client *RPCClient) backgroundReceivingLoop(stopSignal <-chan struct{}) err
 	// Start listing for new messages
 	go func() {
 		for {
+			// TODO
 			msg := make([]byte, 512)
 			n, err := client.conn.Read(msg)
 			if err != nil {

@@ -7,6 +7,11 @@ import (
 	"github.com/karyontech/karyon-go/jsonrpc/message"
 )
 
+const (
+	// The default buffer size for response channels.
+	DefaultChannelBufferSize = 1
+)
+
 var (
 	ChannelNotFoundError = errors.New("Request channel not found")
 )
@@ -15,15 +20,24 @@ var (
 // channels, and it is protected by mutex
 type MessageDispatcher struct {
 	sync.Mutex
-	chans map[message.RequestID]chan<- message.Response
+	chans      map[message.RequestID]chan<- message.Response
+	bufferSize int
 }
 
 // NewMessageDispatcher creates a new MessageDispatcher with an empty channel map.
 // It initializes the internal map for storing request ID to response channel mappings.
-func NewMessageDispatcher() *MessageDispatcher {
+// If bufferSize is 0 or negative, it uses the default buffer size.
+func NewMessageDispatcher(bufferSize int) *MessageDispatcher {
 	chans := make(map[message.RequestID]chan<- message.Response)
+
+	size := DefaultChannelBufferSize
+	if bufferSize > 0  {
+		size = bufferSize 
+	}
+
 	return &MessageDispatcher{
-		chans: chans,
+		chans:      chans,
+		bufferSize: size,
 	}
 }
 
@@ -33,7 +47,7 @@ func (c *MessageDispatcher) Register(key message.RequestID) <-chan message.Respo
 	c.Lock()
 	defer c.Unlock()
 
-	ch := make(chan message.Response)
+	ch := make(chan message.Response, c.bufferSize)
 	c.chans[key] = ch
 	return ch
 }

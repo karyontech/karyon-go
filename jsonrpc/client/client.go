@@ -28,6 +28,9 @@ const (
 
 	// The default buffer size for a subscription.
 	DefaultSubscriptionBufferSize = 10000
+
+	// The default message buffer size for reading messages from the connection.
+	DefaultMessageBufferSize = 512
 )
 
 var (
@@ -42,6 +45,8 @@ type RPCClientConfig struct {
 	Timeout                int    // Timeout for receiving requests from the server, in milliseconds.
 	Addr                   string // Address of the RPC server.
 	SubscriptionBufferSize int    // The buffer size for a subscription.
+	MessageBufferSize      int    // The buffer size for reading messages from the connection.
+	ChannelBufferSize      int    // The buffer size for response channels in MessageDispatcher.
 }
 
 // RPCClient RPC Client
@@ -98,9 +103,17 @@ func NewRPCClient(config RPCClientConfig) (*RPCClient, error) {
 		config.SubscriptionBufferSize = DefaultSubscriptionBufferSize
 	}
 
+	if config.MessageBufferSize <= 0 {
+		config.MessageBufferSize = DefaultMessageBufferSize
+	}
+
+	if config.ChannelBufferSize <= 0 {
+		config.ChannelBufferSize = util.DefaultChannelBufferSize
+	}
+
 	stopSignal := make(chan struct{})
 
-	requests := util.NewMessageDispatcher()
+	requests := util.NewMessageDispatcher(config.ChannelBufferSize)
 	subscriptions := util.NewSubscriptions(config.SubscriptionBufferSize)
 
 	client := &RPCClient{
@@ -206,8 +219,7 @@ func (client *RPCClient) backgroundReceivingLoop(stopSignal <-chan struct{}) err
 	// Start listing for new messages
 	go func() {
 		for {
-			// TODO
-			msg := make([]byte, 512)
+			msg := make([]byte, client.config.MessageBufferSize)
 			n, err := client.conn.Read(msg)
 			if err != nil {
 				receiveErrCh <- err

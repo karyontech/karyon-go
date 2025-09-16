@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sync/atomic"
 	"log/slog"
+	"sync/atomic"
 
 	"github.com/karyontech/karyon-go/jsonrpc/message"
 )

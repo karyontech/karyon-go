@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math/rand"
+	"net"
 	"net/url"
 	"strconv"
 	"sync/atomic"
 	"time"
-	"log/slog"
 
 	"golang.org/x/net/websocket"
 
@@ -46,7 +47,7 @@ type RPCClientConfig struct {
 // RPCClient RPC Client
 type RPCClient struct {
 	config        RPCClientConfig
-	conn          *websocket.Conn
+	conn          net.Conn
 	requests      *util.MessageDispatcher
 	subscriptions *util.Subscriptions
 	stopSignal    chan struct{}
@@ -59,14 +60,35 @@ type RPCClient struct {
 func NewRPCClient(config RPCClientConfig) (*RPCClient, error) {
 	u, err := url.Parse(config.Addr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parsing the url: %w", err)
 	}
-	origin := "http://localhost/"
-	conn, err := websocket.Dial(u.String(), "", origin)
-	if err != nil {
-		return nil, err
+
+	var conn net.Conn
+
+	slog.Info("Connecting to the server...", "url", u)
+	switch u.Scheme {
+	case "ws":
+		origin := fmt.Sprintf("http://%s/", u.Hostname())
+		dialConfig, err := websocket.NewConfig(u.String(), origin)
+		if err != nil {
+			return nil, err
+		}
+
+		conn, err = websocket.DialConfig(dialConfig)
+		if err != nil {
+			return nil, err
+		}
+	case "tcp":
+		conn, err = net.Dial("tcp", u.Host)
+		if err != nil {
+			return nil, err
+		}
+
+	default:
+		return nil, fmt.Errorf("Unsupported protocol: %s", u.Scheme)
 	}
-	slog.Info("Successfully connected to the server", "addr", config.Addr)
+
+	slog.Info("Successfully connected to the server", "url", u)
 
 	if config.Timeout <= 0 {
 		config.Timeout = DefaultTimeout
@@ -184,8 +206,8 @@ func (client *RPCClient) backgroundReceivingLoop(stopSignal <-chan struct{}) err
 	// Start listing for new messages
 	go func() {
 		for {
-			var msg []byte
-			err := websocket.Message.Receive(client.conn, &msg)
+			msg := make([]byte, 512)
+			n, err := client.conn.Read(msg)
 			if err != nil {
 				receiveErrCh <- err
 				return
@@ -193,7 +215,7 @@ func (client *RPCClient) backgroundReceivingLoop(stopSignal <-chan struct{}) err
 			select {
 			case <-client.stopSignal:
 				return
-			case newMsgCh <- msg:
+			case newMsgCh <- msg[:n]:
 			}
 		}
 	}()
@@ -290,7 +312,7 @@ func (client *RPCClient) sendRequest(method string, params any) (message.Respons
 		return response, err
 	}
 
-	err = websocket.Message.Send(client.conn, string(reqJSON))
+	_, err = client.conn.Write(reqJSON)
 	if err != nil {
 		return response, err
 	}

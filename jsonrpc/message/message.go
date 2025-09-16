@@ -24,16 +24,16 @@ type Request struct {
 // Response represents a JSON-RPC response message.
 // It includes the JSON-RPC version, an identifier matching the request, the result of the request, and an optional error.
 type Response struct {
-	JSONRPC string           `json:"jsonrpc"`          // JSON-RPC version, typically "2.0".
-	ID      *RequestID       `json:"id,omitempty"`     // Unique identifier matching the request ID, can be null for notifications.
+	JSONRPC string          `json:"jsonrpc"`          // JSON-RPC version, typically "2.0".
+	ID      *RequestID      `json:"id,omitempty"`     // Unique identifier matching the request ID, can be null for notifications.
 	Result  json.RawMessage `json:"result,omitempty"` // Result of the request if it was successful.
-	Error   *Error           `json:"error,omitempty"`  // Error object if the request failed.
+	Error   *Error          `json:"error,omitempty"`  // Error object if the request failed.
 }
 
 // Notification represents a JSON-RPC notification message.
 type Notification struct {
-	JSONRPC string           `json:"jsonrpc"`          // JSON-RPC version, typically "2.0".
-	Method  string           `json:"method"`           // The name of the method to be invoked.
+	JSONRPC string          `json:"jsonrpc"`          // JSON-RPC version, typically "2.0".
+	Method  string          `json:"method"`           // The name of the method to be invoked.
 	Params  json.RawMessage `json:"params,omitempty"` // Optional parameters for the method.
 }
 
@@ -41,14 +41,14 @@ type Notification struct {
 // It includes the result and the subscription ID that triggered the notification.
 type NotificationResult struct {
 	Result       json.RawMessage `json:"result,omitempty"` // Result data of the notification.
-	Subscription SubscriptionID   `json:"subscription"`     // ID of the subscription that triggered the notification.
+	Subscription SubscriptionID  `json:"subscription"`     // ID of the subscription that triggered the notification.
 }
 
 // Error represents an error in a JSON-RPC response.
 // It includes an error code, a message, and optional additional data.
 type Error struct {
-	Code    int              `json:"code"`           // Error code indicating the type of error.
-	Message string           `json:"message"`        // Human-readable error message.
+	Code    int             `json:"code"`           // Error code indicating the type of error.
+	Message string          `json:"message"`        // Human-readable error message.
 	Data    json.RawMessage `json:"data,omitempty"` // Optional additional data about the error.
 }
 

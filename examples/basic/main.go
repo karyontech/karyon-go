@@ -1,17 +1,3 @@
-
-# Karyon-go
-
-karyon jsonrpc client, written in go.
-
-## Install
-
-```sh
-    go get github.com/karyontech/karyon-go 
-```
-
-## Example 
-
-```go
 package main
 
 import (
@@ -62,14 +48,3 @@ func main() {
 	fmt.Printf("Receive a pong msg: %s", msg)
 
 }
-```
-
-## License
-
-This project is licensed under the GPL-3.0 License. See the
-[LICENSE](https://github.com/karyontech/karyon-go/blob/master/LICENSE) file for
-details. 
-
-## Contributions
-
-Contributions are welcome! Please open an issue or submit a pull request.

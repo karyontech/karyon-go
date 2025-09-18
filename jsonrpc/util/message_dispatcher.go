@@ -31,8 +31,8 @@ func NewMessageDispatcher(bufferSize int) *MessageDispatcher {
 	chans := make(map[message.RequestID]chan<- message.Response)
 
 	size := DefaultChannelBufferSize
-	if bufferSize > 0  {
-		size = bufferSize 
+	if bufferSize > 0 {
+		size = bufferSize
 	}
 
 	return &MessageDispatcher{

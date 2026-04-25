@@ -1,4 +1,4 @@
-package util
+package client
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 
 func TestSubscriptionFullQueue(t *testing.T) {
 	bufSize := 100
-	sub := NewSubscription(1, bufSize)
+	sub := newSubscription(1, bufSize)
 
 	var wg sync.WaitGroup
 
@@ -22,13 +22,13 @@ func TestSubscriptionFullQueue(t *testing.T) {
 			if err != nil {
 				t.Errorf("json.Marshal failed: %v", err)
 			}
-			err = sub.Notify(b)
+			err = sub.notify(b)
 			if i > bufSize {
 				if err == nil {
 					t.Error("expected error when queue is full")
 				}
-				if !errors.Is(err, QueueIsFullError) {
-					t.Errorf("expected QueueIsFullError, got %v", err)
+				if !errors.Is(err, errQueueIsFull) {
+					t.Errorf("expected errQueueIsFull, got %v", err)
 				}
 			}
 		}
@@ -39,7 +39,7 @@ func TestSubscriptionFullQueue(t *testing.T) {
 
 func TestSubscriptionRecv(t *testing.T) {
 	bufSize := 100
-	sub := NewSubscription(1, bufSize)
+	sub := newSubscription(1, bufSize)
 
 	var wg sync.WaitGroup
 
@@ -51,7 +51,7 @@ func TestSubscriptionRecv(t *testing.T) {
 			if err != nil {
 				t.Errorf("json.Marshal failed: %v", err)
 			}
-			err = sub.Notify(b)
+			err = sub.notify(b)
 			if err != nil {
 				t.Errorf("sub.Notify failed: %v", err)
 			}
@@ -82,7 +82,7 @@ func TestSubscriptionRecv(t *testing.T) {
 }
 
 func TestSubscriptionClose(t *testing.T) {
-	sub := NewSubscription(1, 10)
+	sub := newSubscription(1, 10)
 
 	sub.Close()
 
@@ -95,11 +95,11 @@ func TestSubscriptionClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Marshal failed: %v", err)
 	}
-	err = sub.Notify(b)
+	err = sub.notify(b)
 	if err == nil {
 		t.Fatal("expected error when notifying closed subscription")
 	}
-	if !errors.Is(err, SubscriptionIsClosedError) {
-		t.Fatalf("expected SubscriptionIsClosedError, got %v", err)
+	if !errors.Is(err, errSubscriptionIsClosed) {
+		t.Fatalf("expected errSubscriptionIsClosed, got %v", err)
 	}
 }

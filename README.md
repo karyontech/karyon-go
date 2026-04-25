@@ -1,12 +1,20 @@
 
-# Karyon-go
+# karyon-jsonrpc-go
 
-karyon jsonrpc client, written in go.
+A Go client for the [karyon](https://github.com/karyontech/karyon) JSON-RPC 2.0
+server (Rust).
+
+Currently the `tcp://` and `tls://` transports are supported. Other
+transports (`ws`, `wss`, `unix`, `quic`, `http`) supported by the Rust
+implementation will be added later.
+
+For `tls://`, set `RPCClientConfig.TLSConfig` to a `*tls.Config`
+(passing `nil` uses the system roots and verifies the hostname).
 
 ## Install
 
 ```sh
-    go get github.com/karyontech/karyon-go 
+    go get github.com/karyontech/karyon-jsonrpc-go
 ```
 
 ## Example 
@@ -20,14 +28,13 @@ import (
 	"os"
 	"time"
 
-	rpc "github.com/karyontech/karyon-go/jsonrpc/client"
+	rpc "github.com/karyontech/karyon-jsonrpc-go/jsonrpc/client"
 )
 
 func main() {
 
 	config := rpc.RPCClientConfig{
-		Addr: "ws://localhost:7000/",
-		// Addr: "tcp://localhost:7000/",
+		Addr: "tcp://localhost:7000/",
 	}
 
 	client, err := rpc.NewRPCClient(config)
@@ -66,9 +73,9 @@ func main() {
 
 ## License
 
-This project is licensed under the GPL-3.0 License. See the
-[LICENSE](https://github.com/karyontech/karyon-go/blob/master/LICENSE) file for
-details. 
+This project is licensed under the MIT License. See the
+[LICENSE](https://github.com/karyontech/karyon-jsonrpc-go/blob/master/LICENSE) file for
+details.
 
 ## Contributions
 

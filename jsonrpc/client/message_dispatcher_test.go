@@ -1,15 +1,15 @@
-package util
+package client
 
 import (
 	"sync"
 	"sync/atomic"
 	"testing"
 
-	"github.com/karyontech/karyon-go/jsonrpc/message"
+	"github.com/karyontech/karyon-jsonrpc-go/jsonrpc/message"
 )
 
 func TestDispatchToChannel(t *testing.T) {
-	messageDispatcher := NewMessageDispatcher(1)
+	messageDispatcher := newMessageDispatcher(1)
 
 	req1 := "1"
 	rx := messageDispatcher.Register(req1)
@@ -73,7 +73,7 @@ func TestDispatchToChannel(t *testing.T) {
 }
 
 func TestUnregisterChannel(t *testing.T) {
-	messageDispatcher := NewMessageDispatcher(1)
+	messageDispatcher := newMessageDispatcher(1)
 
 	req := "1"
 	rx := messageDispatcher.Register(req)
@@ -92,7 +92,7 @@ func TestUnregisterChannel(t *testing.T) {
 }
 
 func TestClearChannels(t *testing.T) {
-	messageDispatcher := NewMessageDispatcher(1)
+	messageDispatcher := newMessageDispatcher(1)
 
 	req := "1"
 	rx := messageDispatcher.Register(req)

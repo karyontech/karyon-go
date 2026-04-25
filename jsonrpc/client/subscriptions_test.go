@@ -1,4 +1,4 @@
-package util
+package client
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 
 func TestSubscriptionsSubscribe(t *testing.T) {
 	bufSize := 100
-	subs := NewSubscriptions(bufSize)
+	subs := newSubscriptions(bufSize)
 
 	var receivedNotifications atomic.Int32
 
@@ -25,7 +25,7 @@ func TestSubscriptionsSubscribe(t *testing.T) {
 				if err != nil {
 					t.Errorf("json.Marshal failed: %v", err)
 				}
-				err = sub.Notify(b)
+				err = sub.notify(b)
 				if err != nil {
 					t.Errorf("sub.Notify failed: %v", err)
 				}
@@ -76,7 +76,7 @@ func TestSubscriptionsSubscribe(t *testing.T) {
 
 func TestSubscriptionsUnsubscribe(t *testing.T) {
 	bufSize := 100
-	subs := NewSubscriptions(bufSize)
+	subs := newSubscriptions(bufSize)
 
 	var wg sync.WaitGroup
 
@@ -92,12 +92,12 @@ func TestSubscriptionsUnsubscribe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Marshal failed: %v", err)
 	}
-	err = sub.Notify(b)
+	err = sub.notify(b)
 	if err == nil {
 		t.Fatal("expected error when notifying closed subscription")
 	}
-	if !errors.Is(err, SubscriptionIsClosedError) {
-		t.Fatalf("expected SubscriptionIsClosedError, got %v", err)
+	if !errors.Is(err, errSubscriptionIsClosed) {
+		t.Fatalf("expected errSubscriptionIsClosed, got %v", err)
 	}
 
 	wg.Wait()

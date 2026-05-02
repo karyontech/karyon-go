@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,10 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/net/websocket"
-
-	"github.com/karyontech/karyon-go/jsonrpc/message"
-	"github.com/karyontech/karyon-go/jsonrpc/util"
+	"github.com/karyontech/karyon-jsonrpc-go/jsonrpc/message"
 )
 
 const (
@@ -42,19 +40,20 @@ var (
 
 // RPCClientConfig Holds the configuration settings for the RPC client.
 type RPCClientConfig struct {
-	Timeout                int    // Timeout for receiving requests from the server, in milliseconds.
-	Addr                   string // Address of the RPC server.
-	SubscriptionBufferSize int    // The buffer size for a subscription.
-	MessageBufferSize      int    // The buffer size for reading messages from the connection.
-	ChannelBufferSize      int    // The buffer size for response channels in MessageDispatcher.
+	Timeout                int         // Timeout for receiving requests from the server, in milliseconds.
+	Addr                   string      // Address of the RPC server.
+	SubscriptionBufferSize int         // The buffer size for a subscription.
+	MessageBufferSize      int         // The buffer size for reading messages from the connection.
+	ChannelBufferSize      int         // The buffer size for response channels in MessageDispatcher.
+	TLSConfig              *tls.Config // TLS configuration; required for tls:// addresses, ignored otherwise.
 }
 
 // RPCClient RPC Client
 type RPCClient struct {
 	config        RPCClientConfig
 	conn          net.Conn
-	requests      *util.MessageDispatcher
-	subscriptions *util.Subscriptions
+	requests      *messageDispatcher
+	subscriptions *subscriptions
 	stopSignal    chan struct{}
 	isClosed      atomic.Bool
 }
@@ -72,23 +71,16 @@ func NewRPCClient(config RPCClientConfig) (*RPCClient, error) {
 
 	slog.Info("Connecting to the server...", "url", u)
 	switch u.Scheme {
-	case "ws":
-		origin := fmt.Sprintf("http://%s/", u.Hostname())
-		dialConfig, err := websocket.NewConfig(u.String(), origin)
-		if err != nil {
-			return nil, err
-		}
-
-		conn, err = websocket.DialConfig(dialConfig)
-		if err != nil {
-			return nil, err
-		}
 	case "tcp":
 		conn, err = net.Dial("tcp", u.Host)
 		if err != nil {
 			return nil, err
 		}
-
+	case "tls":
+		conn, err = tls.Dial("tcp", u.Host, config.TLSConfig)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, fmt.Errorf("Unsupported protocol: %s", u.Scheme)
 	}
@@ -108,19 +100,19 @@ func NewRPCClient(config RPCClientConfig) (*RPCClient, error) {
 	}
 
 	if config.ChannelBufferSize <= 0 {
-		config.ChannelBufferSize = util.DefaultChannelBufferSize
+		config.ChannelBufferSize = DefaultChannelBufferSize
 	}
 
 	stopSignal := make(chan struct{})
 
-	requests := util.NewMessageDispatcher(config.ChannelBufferSize)
-	subscriptions := util.NewSubscriptions(config.SubscriptionBufferSize)
+	requests := newMessageDispatcher(config.ChannelBufferSize)
+	subs := newSubscriptions(config.SubscriptionBufferSize)
 
 	client := &RPCClient{
 		conn:          conn,
 		config:        config,
 		requests:      requests,
-		subscriptions: subscriptions,
+		subscriptions: subs,
 		stopSignal:    stopSignal,
 	}
 
@@ -146,10 +138,9 @@ func (client *RPCClient) Close() {
 	// Send stop signal to the background receiving loop
 	close(client.stopSignal)
 
-	// Close the underlying websocket connection
 	err := client.conn.Close()
 	if err != nil {
-		slog.Error("Close websocket connection", "error", err)
+		slog.Error("Close connection", "error", err)
 	}
 
 	client.requests.Close()
@@ -170,7 +161,7 @@ func (client *RPCClient) Call(method string, params any) (json.RawMessage, error
 
 // Subscribe sends a subscription request to the server and returns a Subscription object.
 // The subscription can be used to receive notifications from the server for the specified method.
-func (client *RPCClient) Subscribe(method string, params any) (*util.Subscription, error) {
+func (client *RPCClient) Subscribe(method string, params any) (*Subscription, error) {
 	slog.Debug("Subscribe", "method", method, "params", params)
 	response, err := client.sendRequest(method, params)
 	if err != nil {

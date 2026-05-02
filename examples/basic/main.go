@@ -6,14 +6,13 @@ import (
 	"os"
 	"time"
 
-	rpc "github.com/karyontech/karyon-go/jsonrpc/client"
+	rpc "github.com/karyontech/karyon-jsonrpc-go/jsonrpc/client"
 )
 
 func main() {
 
 	config := rpc.RPCClientConfig{
-		Addr: "ws://localhost:7000/",
-		// Addr: "tcp://localhost:7000/",
+		Addr: "tcp://localhost:7000/",
 	}
 
 	client, err := rpc.NewRPCClient(config)

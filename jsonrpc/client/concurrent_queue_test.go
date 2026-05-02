@@ -1,4 +1,4 @@
-package util
+package client
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 )
 
 func TestConcurrentQueuePushPop(t *testing.T) {
-	q := NewConcurrentQueue[int](5)
+	q := newConcurrentQueue[int](5)
 	defer q.Close()
 
 	err := q.Push(42)
@@ -27,7 +27,7 @@ func TestConcurrentQueuePushPop(t *testing.T) {
 
 func TestConcurrentQueueFullQueue(t *testing.T) {
 	bufSize := 3
-	q := NewConcurrentQueue[int](bufSize)
+	q := newConcurrentQueue[int](bufSize)
 	defer q.Close()
 
 	for i := range bufSize {
@@ -42,13 +42,13 @@ func TestConcurrentQueueFullQueue(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when queue is full")
 	}
-	if !errors.Is(err, QueueIsFullError) {
-		t.Errorf("expected QueueIsFullError, got %v", err)
+	if !errors.Is(err, errQueueIsFull) {
+		t.Errorf("expected errQueueIsFull, got %v", err)
 	}
 }
 
 func TestConcurrentQueueFIFO(t *testing.T) {
-	q := NewConcurrentQueue[int](10)
+	q := newConcurrentQueue[int](10)
 	defer q.Close()
 
 	// Push items
@@ -72,7 +72,7 @@ func TestConcurrentQueueFIFO(t *testing.T) {
 }
 
 func TestConcurrentQueueClose(t *testing.T) {
-	q := NewConcurrentQueue[int](10)
+	q := newConcurrentQueue[int](10)
 
 	// Push some items
 	q.Push(1)
@@ -86,8 +86,8 @@ func TestConcurrentQueueClose(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when pushing to closed queue")
 	}
-	if !errors.Is(err, QueueIsClosedError) {
-		t.Errorf("expected QueueIsClosedError, got %v", err)
+	if !errors.Is(err, errQueueIsClosed) {
+		t.Errorf("expected errQueueIsClosed, got %v", err)
 	}
 
 	// Try to pop after close - should fail
@@ -95,8 +95,8 @@ func TestConcurrentQueueClose(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when popping from closed queue")
 	}
-	if !errors.Is(err, QueueIsClosedError) {
-		t.Errorf("expected QueueIsClosedError, got %v", err)
+	if !errors.Is(err, errQueueIsClosed) {
+		t.Errorf("expected errQueueIsClosed, got %v", err)
 	}
 
 	// Closing again should be safe
@@ -104,7 +104,7 @@ func TestConcurrentQueueClose(t *testing.T) {
 }
 
 func TestConcurrentQueueConcurrentAccess(t *testing.T) {
-	q := NewConcurrentQueue[int](100)
+	q := newConcurrentQueue[int](100)
 	defer q.Close()
 
 	var wg sync.WaitGroup
@@ -124,7 +124,7 @@ func TestConcurrentQueueConcurrentAccess(t *testing.T) {
 					if err == nil {
 						break
 					}
-					if errors.Is(err, QueueIsFullError) {
+					if errors.Is(err, errQueueIsFull) {
 						time.Sleep(time.Millisecond)
 						continue
 					}
@@ -146,7 +146,7 @@ func TestConcurrentQueueConcurrentAccess(t *testing.T) {
 			for {
 				item, err := q.Pop()
 				if err != nil {
-					if errors.Is(err, QueueIsClosedError) {
+					if errors.Is(err, errQueueIsClosed) {
 						return
 					}
 					t.Errorf("unexpected error from Pop: %v", err)
@@ -178,7 +178,7 @@ func TestConcurrentQueueConcurrentAccess(t *testing.T) {
 }
 
 func TestConcurrentQueueBlockingPop(t *testing.T) {
-	q := NewConcurrentQueue[string](5)
+	q := newConcurrentQueue[string](5)
 	defer q.Close()
 
 	var wg sync.WaitGroup
@@ -218,7 +218,7 @@ func TestConcurrentQueueBlockingPop(t *testing.T) {
 }
 
 func TestConcurrentQueueCloseUnblocksPop(t *testing.T) {
-	q := NewConcurrentQueue[int](5)
+	q := newConcurrentQueue[int](5)
 
 	var wg sync.WaitGroup
 	popDone := make(chan bool, 1)
@@ -230,8 +230,8 @@ func TestConcurrentQueueCloseUnblocksPop(t *testing.T) {
 		_, err := q.Pop()
 		if err == nil {
 			t.Error("expected error from Pop after close")
-		} else if !errors.Is(err, QueueIsClosedError) {
-			t.Errorf("expected QueueIsClosedError, got %v", err)
+		} else if !errors.Is(err, errQueueIsClosed) {
+			t.Errorf("expected errQueueIsClosed, got %v", err)
 		}
 		popDone <- true
 	}()
@@ -251,7 +251,7 @@ func TestConcurrentQueueCloseUnblocksPop(t *testing.T) {
 
 func TestConcurrentQueueWithDifferentTypes(t *testing.T) {
 	// Test with string type
-	stringQ := NewConcurrentQueue[string](3)
+	stringQ := newConcurrentQueue[string](3)
 	defer stringQ.Close()
 
 	stringQ.Push("hello")
@@ -270,7 +270,7 @@ func TestConcurrentQueueWithDifferentTypes(t *testing.T) {
 		Name string
 	}
 
-	structQ := NewConcurrentQueue[TestStruct](2)
+	structQ := newConcurrentQueue[TestStruct](2)
 	defer structQ.Close()
 
 	testItem := TestStruct{ID: 1, Name: "test"}

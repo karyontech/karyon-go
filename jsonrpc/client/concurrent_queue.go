@@ -1,4 +1,4 @@
-package util
+package client
 
 import (
 	"errors"
@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 )
 
-// queue A concurrent queue.
-type ConcurrentQueue[T any] struct {
+// concurrentQueue is a bounded, thread-safe FIFO queue.
+type concurrentQueue[T any] struct {
 	lock       sync.Mutex
 	cond       *sync.Cond
 	items      []T
@@ -17,14 +17,13 @@ type ConcurrentQueue[T any] struct {
 }
 
 var (
-	QueueIsFullError   = errors.New("Queue is full")
-	QueueIsClosedError = errors.New("Queue is closed")
+	errQueueIsFull   = errors.New("Queue is full")
+	errQueueIsClosed = errors.New("Queue is closed")
 )
 
-// NewConcurrentQueue creates a new concurrent queue with the specified buffer size.
-// It initializes the queue with empty items slice and sets up synchronization primitives.
-func NewConcurrentQueue[T any](bufferSize int) *ConcurrentQueue[T] {
-	q := &ConcurrentQueue[T]{
+// newConcurrentQueue creates a new concurrent queue with the specified buffer size.
+func newConcurrentQueue[T any](bufferSize int) *concurrentQueue[T] {
+	q := &concurrentQueue[T]{
 		bufferSize: bufferSize,
 		items:      make([]T, 0),
 		stopSignal: make(chan struct{}),
@@ -35,15 +34,15 @@ func NewConcurrentQueue[T any](bufferSize int) *ConcurrentQueue[T] {
 
 // Push adds a new item to the end of the queue.
 // It returns an error if the queue is full or closed.
-func (q *ConcurrentQueue[T]) Push(item T) error {
+func (q *concurrentQueue[T]) Push(item T) error {
 	if q.isClosed.Load() {
-		return QueueIsClosedError
+		return errQueueIsClosed
 	}
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
 	if len(q.items) >= q.bufferSize {
-		return QueueIsFullError
+		return errQueueIsFull
 	}
 
 	q.items = append(q.items, item)
@@ -53,10 +52,10 @@ func (q *ConcurrentQueue[T]) Push(item T) error {
 
 // Pop waits for and removes the first element from the queue.
 // It blocks until an item is available or the queue is closed, then returns the item.
-func (q *ConcurrentQueue[T]) Pop() (T, error) {
+func (q *concurrentQueue[T]) Pop() (T, error) {
 	var t T
 	if q.isClosed.Load() {
-		return t, QueueIsClosedError
+		return t, errQueueIsClosed
 	}
 	q.lock.Lock()
 	defer q.lock.Unlock()
@@ -66,7 +65,7 @@ func (q *ConcurrentQueue[T]) Pop() (T, error) {
 	for len(q.items) == 0 {
 		select {
 		case <-q.stopSignal:
-			return t, QueueIsClosedError
+			return t, errQueueIsClosed
 		default:
 			q.cond.Wait()
 		}
@@ -79,7 +78,7 @@ func (q *ConcurrentQueue[T]) Pop() (T, error) {
 
 // Close terminates the queue and releases all resources.
 // It marks the queue as closed, clears all items, and wakes up any waiting goroutines.
-func (q *ConcurrentQueue[T]) Close() {
+func (q *concurrentQueue[T]) Close() {
 	if !q.isClosed.CompareAndSwap(false, true) {
 		return
 	}
